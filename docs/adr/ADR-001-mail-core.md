@@ -1,8 +1,14 @@
 # ADR-001: Mail core selection (Stalwart vs Postfix+Dovecot)
 
 Date: 2026-08-20
-Status: Proposed (decision direction fixed; final acceptance after PoC in the
-Linux phase)
+Status: Accepted for local phase (stage 2). Stalwart v0.13.4 runs in compose;
+PoC criteria 1–3 and 6 verified locally via the `internal/mailcore` provider
+and `cmd/mailcheck` (provisioning API, authenticated 587 submission, local
+delivery + JMAP retrieval, containerized persistent storage). Criteria 4–5
+(outbound DKIM relay, bounce/delivery signals) remain open until the
+internet-mail phase; any blocker there still reopens Option B. Note: v0.16+
+switched to an interactive bootstrap with JSON config — the pin stays on
+v0.13.x until that setup is automatable.
 
 ## Context
 

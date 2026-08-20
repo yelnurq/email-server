@@ -1,0 +1,68 @@
+# Stalwart Mail Server — local development configuration for the mail
+# platform. Mounted read-only into the container at
+# /opt/stalwart/etc/config.toml.
+#
+# Principles:
+#   - the Go control plane provisions domains/accounts via the management API
+#     using the fallback admin (secret injected via STALWART_ADMIN_SECRET);
+#   - data persists in the stalwartdata volume (RocksDB);
+#   - TLS uses Stalwart's built-in self-signed certificate in development —
+#     mail clients must allow it; production replaces this with real certs.
+
+[server]
+hostname = "mail.company.test"
+
+[server.listener.smtp]
+bind = ["[::]:25"]
+protocol = "smtp"
+
+[server.listener.submission]
+bind = ["[::]:587"]
+protocol = "smtp"
+
+[server.listener.submissions]
+bind = ["[::]:465"]
+protocol = "smtp"
+tls.implicit = true
+
+[server.listener.imap]
+bind = ["[::]:143"]
+protocol = "imap"
+
+[server.listener.imaptls]
+bind = ["[::]:993"]
+protocol = "imap"
+tls.implicit = true
+
+# Management REST API + JMAP + web admin share the HTTP listener.
+[server.listener.http]
+bind = ["[::]:8080"]
+protocol = "http"
+
+[storage]
+data = "rocksdb"
+fts = "rocksdb"
+blob = "rocksdb"
+lookup = "rocksdb"
+directory = "internal"
+
+[store.rocksdb]
+type = "rocksdb"
+path = "/opt/stalwart/data"
+compression = "lz4"
+
+[directory.internal]
+type = "internal"
+store = "rocksdb"
+
+[tracer.stdout]
+type = "stdout"
+level = "info"
+ansi = false
+enable = true
+
+# Management credentials for the control plane. The secret comes from the
+# environment; no secret value lives in this file.
+[authentication.fallback-admin]
+user = "admin"
+secret = "%{env:STALWART_ADMIN_SECRET}%"

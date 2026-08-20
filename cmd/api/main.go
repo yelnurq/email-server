@@ -34,6 +34,7 @@ import (
 	"github.com/yelnurq/email-server/internal/groups"
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailbox"
+	"github.com/yelnurq/email-server/internal/mailcore"
 	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/official"
 	"github.com/yelnurq/email-server/internal/organization"
@@ -42,9 +43,12 @@ import (
 	"github.com/yelnurq/email-server/internal/smtpcreds"
 	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/tenant"
+	"github.com/yelnurq/email-server/internal/trace"
 	"github.com/yelnurq/email-server/internal/users"
 	"github.com/yelnurq/email-server/internal/webhooks"
 	"github.com/yelnurq/email-server/internal/worklist"
+
+	"github.com/yelnurq/email-server/internal/httpx"
 )
 
 func main() {
@@ -116,6 +120,18 @@ func run() error {
 		S3HealthURL: strings.TrimRight(cfg.S3Endpoint, "/") + "/minio/health/live",
 	}
 
+	// Mail core: product logic goes through the provider abstraction only.
+	var mailCore mailcore.Provider = mailcore.Disabled{}
+	if cfg.MailCoreProvider == "stalwart" {
+		mailCore = &mailcore.Stalwart{
+			BaseURL:   cfg.StalwartBaseURL,
+			AdminUser: cfg.StalwartAdminUser,
+			AdminPass: cfg.StalwartAdminPass,
+		}
+	}
+	log.Info("mail core provider", slog.String("provider", mailCore.Name()))
+	infra := &server.InfraMonitor{Health: health, Provider: mailCore, TTL: 10 * time.Second}
+
 	// Mail-plane topology and the transactional outbox publisher.
 	if err := events.EnsureStream(nc); err != nil {
 		log.Warn("could not ensure NATS stream at startup; publisher will retry",
@@ -145,18 +161,20 @@ func run() error {
 	go (&worklist.Processor{Pool: pool, NATS: nc, Log: log}).Run(ctx)
 	bulkHandlers := &bulkmail.Handlers{Pool: pool, Audit: auditLog}
 	go (&bulkmail.Processor{Pool: pool, Messages: messageService, Audit: auditLog, Log: log}).Run(ctx)
-	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	provisioner := &mailcore.Provisioner{Pool: pool, Provider: mailCore, Audit: auditLog, Log: log}
+	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner}
 	departmentHandlers := &departments.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	collabHandlers := &collab.Handlers{Pool: pool, NATS: nc, Log: log}
-	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log}
-	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner}
+	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log, Provider: mailCore, Provisioner: provisioner}
 	aliasHandlers := &aliases.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	webhookHandlers := &webhooks.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	securityHandlers := &security.Handlers{Pool: pool, Audit: auditLog, Log: log}
-	smtpCredHandlers := &smtpcreds.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	smtpCredHandlers := &smtpcreds.Handlers{Pool: pool, Audit: auditLog, Log: log, Provider: mailCore}
 	auditHandlers := &auditapi.Handlers{Pool: pool}
+	traceHandlers := &trace.Handlers{Pool: pool, Log: log}
 	emailAPI := &emailapi.Handlers{
 		Pool: pool,
 		Keys: &apikeys.Service{Pool: pool},
@@ -183,6 +201,8 @@ func run() error {
 					Get("/domains", domainHandlers.List)
 				admin.With(auth.RequirePermission("domains.manage")).
 					Post("/domains", domainHandlers.Create)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Post("/domains/{id}/provision", domainHandlers.Provision)
 
 				admin.With(auth.RequirePermission("users.manage")).
 					Get("/users", userHandlers.List)
@@ -208,6 +228,10 @@ func run() error {
 					Get("/mailboxes", mailboxHandlers.List)
 				admin.With(auth.RequirePermission("mailboxes.manage")).
 					Post("/mailboxes", mailboxHandlers.Create)
+				admin.With(auth.RequirePermission("mailboxes.manage")).
+					Patch("/mailboxes/{id}", mailboxHandlers.Patch)
+				admin.With(auth.RequirePermission("mailboxes.manage")).
+					Post("/mailboxes/{id}/provision", mailboxHandlers.Provision)
 
 				admin.Group(func(mbadmin chi.Router) {
 					mbadmin.Use(auth.RequirePermission("mailboxes.manage"))
@@ -255,6 +279,15 @@ func run() error {
 
 				admin.With(auth.RequirePermission("audit.read")).
 					Get("/audit", auditHandlers.List)
+
+				// Operational tools: Message Trace and infrastructure health.
+				admin.Group(func(ops chi.Router) {
+					ops.Use(auth.RequirePermission("security.manage"))
+					ops.Get("/admin/messages", traceHandlers.List)
+					ops.Get("/admin/messages/{publicID}/trace", traceHandlers.Get)
+				})
+				admin.With(auth.RequirePermission("users.manage")).
+					Get("/system/infrastructure", infra.Infrastructure)
 
 				admin.Group(func(chat chi.Router) {
 					chat.Use(auth.RequirePermission("messages.send"))
@@ -312,8 +345,26 @@ func run() error {
 				mail.Get("/mail/summary", webmail.Summary)
 				mail.Get("/mail/messages", webmail.List)
 				mail.Get("/mail/messages/{id}", webmail.Get)
+				mail.Get("/mail/messages/{id}/events", webmail.Events)
 				mail.Patch("/mail/messages/{id}", webmail.Patch)
 				mail.Delete("/mail/messages/{id}", webmail.Delete)
+
+				// Mail client connection parameters (Settings → Mail clients).
+				// Static configuration; passwords are never included.
+				mail.Get("/mail/client-config", func(w http.ResponseWriter, r *http.Request) {
+					httpx.JSON(w, http.StatusOK, map[string]any{
+						"enabled": mailCore.Enabled(),
+						"imap": map[string]string{
+							"host": cfg.MailClientHost, "port": cfg.MailClientIMAPPort,
+							"encryption": "SSL/TLS (self-signed in development)",
+						},
+						"smtp": map[string]string{
+							"host": cfg.MailClientHost, "port": cfg.MailClientSMTPPort,
+							"encryption": "STARTTLS (self-signed in development)",
+						},
+						"login_hint": "Sign in with your mailbox address and an SMTP credential password issued by your administrator.",
+					})
+				})
 
 				mail.With(auth.RequirePermission("mail.send")).
 					Post("/mail/send", webmail.Send)

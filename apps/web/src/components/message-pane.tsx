@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
-import { API_URL, api, formatBytes, formatDate, type MailSummary, type MessageDetail, type MessageList } from "@/lib/api";
+import { API_URL, api, formatBytes, formatDate, type DeliveryEvents, type MailSummary, type MessageDetail, type MessageList } from "@/lib/api";
 import { Avatar, Badge, Button, ConfirmDialog, ErrorState, IconButton, Menu, Skeleton, Spinner, cx, useToast } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { useCompose } from "@/components/compose";
@@ -24,6 +24,65 @@ function reminderDate(kind: "today" | "tomorrow" | "week"): string {
   if (kind === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
   if (kind === "week") { d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); }
   return d.toISOString();
+}
+
+// DeliveryStatus shows the real delivery outcome of a sent message: overall
+// status, per-recipient results and the recorded event timeline. Rendered
+// only for the sender's Sent copy; data comes from message_events.
+function DeliveryStatus({ id }: { id: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const events = useQuery({
+    queryKey: ["mail", "events", id],
+    queryFn: () => api.get<DeliveryEvents>(`/api/v1/mail/messages/${id}/events`),
+    staleTime: 15_000,
+  });
+  if (!events.isSuccess) return null;
+
+  const tone =
+    events.data.status === "delivered" ? "success"
+    : events.data.status === "failed" ? "danger"
+    : events.data.status === "partially_delivered" || events.data.status === "quarantined" ? "warning"
+    : "neutral";
+  const failed = events.data.recipients.filter((r) => r.status === "failed");
+
+  return (
+    <div className="anim-rise mt-3 rounded-[8px] border border-border bg-background px-3.5 py-2.5 text-xs">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 text-left"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <Badge tone={tone}>{events.data.status.replace("_", " ")}</Badge>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">
+          {failed.length > 0
+            ? `${failed.length} of ${events.data.recipients.length} recipient${events.data.recipients.length > 1 ? "s" : ""} failed`
+            : `${events.data.recipients.length} recipient${events.data.recipients.length > 1 ? "s" : ""}`}
+        </span>
+        <Icon name="chevron-down" className={cx("h-3 w-3 shrink-0 transition-transform", expanded && "rotate-180")} />
+      </button>
+      {expanded && (
+        <div className="mt-2.5 space-y-2 border-t border-border pt-2.5">
+          {events.data.recipients.map((r) => (
+            <p key={r.address} className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate">{r.address}</span>
+              <span className={cx("shrink-0 font-medium", r.status === "delivered" ? "text-success" : r.status === "failed" ? "text-danger" : "text-warning")}>
+                {r.status}
+              </span>
+              {r.error && <span className="shrink-0 text-faint">{r.error}</span>}
+            </p>
+          ))}
+          {events.data.events.length > 0 && (
+            <div className="border-t border-border pt-2 text-faint">
+              {events.data.events.map((e, i) => (
+                <p key={i} className="font-mono text-[11px]">{formatDate(e.created_at)} · {e.type}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MessagePane({
@@ -238,6 +297,8 @@ export function MessagePane({
             </div>
             <span className="shrink-0 pt-0.5 text-xs text-muted-foreground" title={m.date}>{fullDate(m.date)}</span>
           </div>
+
+          {m.folder === "sent" && <DeliveryStatus id={m.id} />}
 
           {showDetails && (
             <dl className="anim-rise mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-[8px] border border-border bg-background px-3.5 py-3 text-xs">

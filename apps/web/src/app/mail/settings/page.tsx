@@ -4,8 +4,8 @@
 // working settings — the platform ships a single theme by design.
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api, ApiError, type MailClientConfig, type MailSummary } from "@/lib/api";
 import { LocaleSwitcher, useI18n, useMe } from "@/components/providers";
 import { Avatar, Badge, Button, Input, useToast } from "@/components/ui";
 
@@ -28,6 +28,17 @@ export default function SettingsPage() {
 
   const isAdmin = me.data?.permissions.includes("users.manage");
   const displayName = me.data?.display_name || me.data?.email || "";
+
+  const clientConfig = useQuery({
+    queryKey: ["mail", "client-config"],
+    queryFn: () => api.get<MailClientConfig>("/api/v1/mail/client-config"),
+    staleTime: 5 * 60_000,
+  });
+  const summary = useQuery({
+    queryKey: ["mail", "summary"],
+    queryFn: () => api.get<MailSummary>("/api/v1/mail/summary"),
+    staleTime: 60_000,
+  });
 
   return (
     <div className="h-full w-full overflow-y-auto">
@@ -82,6 +93,42 @@ export default function SettingsPage() {
             <LocaleSwitcher />
           </div>
         </section>
+
+        {/* Mail clients (IMAP/SMTP) — shown only when the mail core is on */}
+        {clientConfig.data?.enabled && (
+          <section className="mt-4 overflow-hidden rounded-[10px] border border-border bg-surface-elevated">
+            <header className="border-b border-border bg-background/60 px-4 py-2.5">
+              <h2 className="text-[13px] font-semibold">Mail clients (IMAP / SMTP)</h2>
+            </header>
+            <div className="px-4 py-4">
+              <p className="text-[13px] text-muted-foreground">
+                Use these settings in Outlook, Thunderbird or a phone mail app. Your login is your
+                mailbox address; the password is an SMTP credential issued by your administrator —
+                your account password does not work for mail clients.
+              </p>
+              <dl className="mt-3 grid gap-px rounded-[8px] border border-border bg-border sm:grid-cols-2">
+                <div className="bg-surface-elevated px-4 py-3">
+                  <dt className="text-[11px] font-medium text-muted-foreground">Incoming — IMAP</dt>
+                  <dd className="mt-0.5 font-mono text-[13px]">
+                    {clientConfig.data.imap.host}:{clientConfig.data.imap.port}
+                  </dd>
+                  <dd className="text-[11px] text-faint">{clientConfig.data.imap.encryption}</dd>
+                </div>
+                <div className="bg-surface-elevated px-4 py-3">
+                  <dt className="text-[11px] font-medium text-muted-foreground">Outgoing — SMTP</dt>
+                  <dd className="mt-0.5 font-mono text-[13px]">
+                    {clientConfig.data.smtp.host}:{clientConfig.data.smtp.port}
+                  </dd>
+                  <dd className="text-[11px] text-faint">{clientConfig.data.smtp.encryption}</dd>
+                </div>
+                <div className="bg-surface-elevated px-4 py-3 sm:col-span-2">
+                  <dt className="text-[11px] font-medium text-muted-foreground">Username</dt>
+                  <dd className="mt-0.5 font-mono text-[13px]">{summary.data?.mailbox.address || me.data?.email}</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+        )}
 
         {/* Password */}
         <section className="mt-4 overflow-hidden rounded-[10px] border border-border bg-surface-elevated">

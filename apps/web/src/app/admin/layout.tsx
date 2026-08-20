@@ -43,6 +43,13 @@ const GROUPS: Array<{ label: string; items: Array<{ href: string; label: string;
     ],
   },
   {
+    label: "operations",
+    items: [
+      { href: "/admin/trace", label: "messageTrace", icon: "search", permission: "security.manage" },
+      { href: "/admin/infrastructure", label: "infrastructureHealth", icon: "activity", permission: "users.manage" },
+    ],
+  },
+  {
     label: "security",
     items: [
       { href: "/admin/security", label: "securityCenter", icon: "shield", permission: "security.manage" },

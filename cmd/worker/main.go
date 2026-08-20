@@ -52,6 +52,9 @@ func run() error {
 	}
 	defer nc.Drain()
 
+	// Heartbeat: the control plane reports worker liveness from this row.
+	go heartbeat(ctx, pool, log)
+
 	dispatcher := &webhooks.Dispatcher{Pool: pool, NATS: nc, Log: log}
 	dispatchErr := make(chan error, 1)
 	go func() {
@@ -78,4 +81,41 @@ func run() error {
 	}
 	log.Info("worker shutting down")
 	return nil
+}
+
+// heartbeat upserts the worker liveness row every 10 seconds. started_at is
+// reset on the first beat of each process so restarts are visible.
+func heartbeat(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) {
+	hostname, _ := os.Hostname()
+	first := true
+	beat := func() {
+		var err error
+		if first {
+			_, err = pool.Exec(ctx, `
+				INSERT INTO worker_heartbeats (name, hostname, beat_at, started_at)
+				VALUES ('worker', $1, now(), now())
+				ON CONFLICT (name) DO UPDATE
+				SET beat_at = now(), started_at = now(), hostname = EXCLUDED.hostname`,
+				hostname)
+		} else {
+			_, err = pool.Exec(ctx, `
+				UPDATE worker_heartbeats SET beat_at = now() WHERE name = 'worker'`)
+		}
+		if err != nil {
+			log.Warn("worker heartbeat failed", slog.String("error", err.Error()))
+			return
+		}
+		first = false
+	}
+	beat()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			beat()
+		}
+	}
 }

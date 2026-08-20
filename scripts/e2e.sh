@@ -272,7 +272,41 @@ else
   say "  SKIP: node not found, webhook checks skipped"
 fi
 
-# --- 10. Sessions ------------------------------------------------------------
+# --- 10. Self-mail (A → A lands in both Sent and Inbox) ----------------------
+SELF=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T1" \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":[\"$A1\"],\"subject\":\"selfmail $R\",\"text\":\"note to self\"}" | jsonval message_id)
+[ -n "$SELF" ] && pass "self-mail accepted" || fail "self-mail send"
+poll_inbox "$T1" "selfmail $R" inbox && pass "self-mail in Inbox" || fail "self-mail missing from Inbox"
+poll_inbox "$T1" "selfmail $R" sent && pass "self-mail in Sent" || fail "self-mail missing from Sent"
+
+# --- 11. Message trace + delivery events -------------------------------------
+tr_status=$(curl -s "$API/api/v1/admin/messages?q=$SELF" -H "Authorization: Bearer $ADM" | jsonval status)
+[ "$tr_status" = "delivered" ] && pass "message trace search finds self-mail (delivered)" \
+  || fail "message trace search ($tr_status)"
+trace=$(curl -s "$API/api/v1/admin/messages/$SELF/trace" -H "Authorization: Bearer $ADM")
+printf '%s' "$trace" | grep -q "email.accepted" && printf '%s' "$trace" | grep -q "email.delivered_local" \
+  && pass "trace timeline has accepted + delivered events" || fail "trace timeline incomplete"
+st=$(code GET "/api/v1/admin/messages/$SELF/trace" "$T1")
+[ "$st" = "403" ] && pass "member blocked from message trace" || fail "trace RBAC ($st)"
+
+# --- 12. Infrastructure health -----------------------------------------------
+infra=$(curl -s "$API/api/v1/system/infrastructure" -H "Authorization: Bearer $ADM")
+printf '%s' "$infra" | grep -q '"name":"worker"' \
+  && pass "infrastructure report includes worker" || fail "infrastructure report"
+st=$(code GET /api/v1/system/infrastructure "$T1")
+[ "$st" = "403" ] && pass "member blocked from infrastructure" || fail "infrastructure RBAC ($st)"
+
+# --- 13. Mail-core provisioning lifecycle ------------------------------------
+prov=$(curl -s "$API/api/v1/domains" -H "Authorization: Bearer $ADM" \
+  | grep -o "\"name\":\"$DOMAIN\"[^}]*" | jsonval provisioning_status)
+case "$prov" in
+  active|skipped) pass "e2e domain provisioning status is terminal ($prov)" ;;
+  failed) fail "domain provisioning failed (mail core down during e2e?)" ;;
+  *) fail "domain provisioning status ($prov)" ;;
+esac
+
+# --- 14. Sessions ------------------------------------------------------------
 curl -s -X POST "$API/api/v1/auth/logout" -H "Authorization: Bearer $T2" > /dev/null
 st=$(code GET /api/v1/mail/summary "$T2")
 [ "$st" = "401" ] && pass "revoked session rejected" || fail "session revocation ($st)"

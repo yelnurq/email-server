@@ -295,7 +295,7 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id, is_read)
 		VALUES ($1, $2, $3, true)
-		ON CONFLICT (mailbox_id, message_id) DO NOTHING`,
+		ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
 		sender.ID, msgID, sentFolderID); err != nil {
 		return "", "", err
 	}

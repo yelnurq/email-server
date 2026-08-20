@@ -106,7 +106,7 @@ func (h *Handlers) Release(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := tx.Exec(r.Context(), `
 		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id)
-		VALUES ($1, $2, $3) ON CONFLICT (mailbox_id, message_id) DO NOTHING`,
+		VALUES ($1, $2, $3) ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
 		*mailboxID, messageID, inboxID); err != nil {
 		httpx.Internal(w, r)
 		return

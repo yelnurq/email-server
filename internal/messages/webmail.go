@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -301,6 +302,45 @@ type patchRequest struct {
 	FolderType *string `json:"folder"`
 }
 
+// moveCopy moves one mailbox copy into the mailbox's folder of the given
+// type. Since (mailbox_id, message_id, folder_id) is unique and a message may
+// legitimately exist in several folders (self-mail: Sent + Inbox), a copy
+// already present in the target folder is merged: the duplicate is removed
+// before the move so the operation never trips the constraint.
+func (h *WebmailHandlers) moveCopy(ctx context.Context, mmID, mailboxID, folderType string) (ok bool, err error) {
+	tx, err := h.Svc.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var messageID, targetFolderID string
+	err = tx.QueryRow(ctx, `
+		SELECT mm.message_id, f.id
+		FROM mailbox_messages mm
+		JOIN folders f ON f.mailbox_id = mm.mailbox_id AND f.type = $3
+		WHERE mm.id = $1 AND mm.mailbox_id = $2`, mmID, mailboxID, folderType).
+		Scan(&messageID, &targetFolderID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM mailbox_messages
+		WHERE mailbox_id = $1 AND message_id = $2 AND folder_id = $3 AND id <> $4`,
+		mailboxID, messageID, targetFolderID, mmID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE mailbox_messages SET folder_id = $1 WHERE id = $2`,
+		targetFolderID, mmID); err != nil {
+		return false, err
+	}
+	return true, tx.Commit(ctx)
+}
+
 // Patch updates per-mailbox message state (read/star/move).
 func (h *WebmailHandlers) Patch(w http.ResponseWriter, r *http.Request) {
 	_, mb, ok := h.senderMailbox(w, r)
@@ -330,13 +370,12 @@ func (h *WebmailHandlers) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.FolderType != nil {
-		ct, err := h.Svc.Pool.Exec(r.Context(), `
-			UPDATE mailbox_messages mm SET folder_id = f.id
-			FROM folders f
-			WHERE mm.id = $1 AND mm.mailbox_id = $2
-			  AND f.mailbox_id = mm.mailbox_id AND f.type = $3`,
-			mmID, mb.ID, *req.FolderType)
-		if err != nil || ct.RowsAffected() == 0 {
+		ok, err := h.moveCopy(r.Context(), mmID, mb.ID, *req.FolderType)
+		if err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		if !ok {
 			httpx.Error(w, r, http.StatusBadRequest, "INVALID_FOLDER", "Unknown target folder")
 			return
 		}
@@ -384,16 +423,95 @@ func (h *WebmailHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	default:
-		if _, err := h.Svc.Pool.Exec(r.Context(), `
-			UPDATE mailbox_messages mm SET folder_id = f.id
-			FROM folders f
-			WHERE mm.id = $1 AND mm.mailbox_id = $2
-			  AND f.mailbox_id = mm.mailbox_id AND f.type = 'trash'`, mmID, mb.ID); err != nil {
+		if _, err := h.moveCopy(r.Context(), mmID, mb.ID, "trash"); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// Events returns the delivery timeline of one of the caller's messages.
+// Full recipient statuses are only shown to the sender; recipients see just
+// the receive event of their own copy.
+func (h *WebmailHandlers) Events(w http.ResponseWriter, r *http.Request) {
+	_, mb, ok := h.senderMailbox(w, r)
+	if !ok {
+		return
+	}
+	mmID := chi.URLParam(r, "id")
+
+	var msgID, from, status string
+	err := h.Svc.Pool.QueryRow(r.Context(), `
+		SELECT m.id, m.from_address::text, m.status
+		FROM mailbox_messages mm
+		JOIN messages m ON m.id = mm.message_id
+		WHERE mm.id = $1 AND mm.mailbox_id = $2`, mmID, mb.ID).
+		Scan(&msgID, &from, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, "MESSAGE_NOT_FOUND", "Message not found")
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if !strings.EqualFold(from, mb.Address) {
+		// Not the sender: no delivery details to show.
+		httpx.JSON(w, http.StatusOK, map[string]any{
+			"status": status, "recipients": []any{}, "events": []any{},
+		})
+		return
+	}
+
+	type recipientStatus struct {
+		Address string `json:"address"`
+		Status  string `json:"status"`
+		Error   string `json:"error,omitempty"`
+	}
+	recipients := []recipientStatus{}
+	recRows, err := h.Svc.Pool.Query(r.Context(), `
+		SELECT address::text, status, error FROM message_recipients
+		WHERE message_id = $1 ORDER BY created_at`, msgID)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer recRows.Close()
+	for recRows.Next() {
+		var rs recipientStatus
+		if err := recRows.Scan(&rs.Address, &rs.Status, &rs.Error); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		recipients = append(recipients, rs)
+	}
+
+	type eventView struct {
+		Type      string `json:"type"`
+		CreatedAt string `json:"created_at"`
+	}
+	events := []eventView{}
+	evRows, err := h.Svc.Pool.Query(r.Context(), `
+		SELECT type, created_at::text FROM message_events
+		WHERE message_id = $1 ORDER BY created_at, id`, msgID)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer evRows.Close()
+	for evRows.Next() {
+		var ev eventView
+		if err := evRows.Scan(&ev.Type, &ev.CreatedAt); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		events = append(events, ev)
+	}
+
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"status": status, "recipients": recipients, "events": events,
+	})
 }
 
 type sendRequest struct {

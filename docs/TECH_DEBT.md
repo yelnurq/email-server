@@ -29,3 +29,14 @@ Real debt only; feature gaps live in PROJECT_STATUS.md. Updated 2026-08-20.
 10. **Repo lives inside OneDrive.** Known to break `create-next-app` and may
     interfere with file watching; recommend moving the checkout outside
     OneDrive.
+11. **App passwords reach Stalwart as `$app$label$<plaintext>`.** Stalwart
+    stores the secret as given and its management API returns it on principal
+    GET. Our API never exposes it, but production should store a supported
+    hash format (e.g. bcrypt) in the secret instead of plaintext.
+12. **Mail-core provisioning is synchronous in request handlers** (15s
+    timeout). Acceptable at current scale; move to a queued job with
+    reconciliation when bulk provisioning or slow mail-core links appear.
+13. **Worker liveness is a DB heartbeat row** (10s upsert, 30s threshold).
+    One worker only; a fleet needs per-instance names and an aggregate view.
+14. **`scripts/e2e.ps1` publishes the webhook port via docker.** If port
+    39991 is taken the webhook checks fail; parameterize when it bites.

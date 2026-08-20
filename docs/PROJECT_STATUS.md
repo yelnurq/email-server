@@ -1,11 +1,12 @@
 # Project Status
 
-Updated: 2026-08-20 (evening). States: VERIFIED (tested by command/E2E),
-IN PROGRESS, NOT STARTED, BLOCKED.
+Updated: 2026-08-20 (night, stage 2). States: VERIFIED (tested by
+command/E2E), IN PROGRESS, NOT STARTED, BLOCKED.
 
-Automated gate: `scripts/e2e.sh` — **37 checks, all passing** — plus Go unit
-tests, `gofmt`/`go vet`, `tsc`, `eslint`, `next build`, and a
-`docker compose restart` persistence check.
+Automated gate: `scripts/e2e.sh` — **46 checks, all passing** (on Windows:
+`scripts/e2e.ps1` runs the same suite in a docker:cli container) — plus Go
+unit tests, `gofmt`/`go vet`, `tsc`, `eslint`, `next build`, and restart
+persistence checks (compose services and Stalwart).
 
 ## VERIFIED
 
@@ -65,15 +66,47 @@ revocable, audited (listener ships with mail-core phase)
 aliases, groups, API keys, SMTP, webhooks (with delivery log), security,
 audit — all RBAC-guarded
 
+**Mail core (Stalwart) — stage 2, VERIFIED**
+- Stalwart v0.13.4 pinned in compose (config `deploy/stalwart/config.toml`,
+  persistent `stalwartdata` volume, healthcheck); admin secret via env only
+- `internal/mailcore`: `Provider` abstraction + `Stalwart` implementation
+  (management REST API, live-verified against v0.13.4 incl. its
+  200-with-error-body responses) + `Disabled` fallback
+  (`MAIL_CORE_PROVIDER=none`)
+- Provisioning lifecycle on domains/mailboxes (`pending → provisioning →
+  active | failed | skipped` + stored error + retry endpoints + audit);
+  wired into domain create, mailbox create, user-with-mailbox create
+- SMTP credentials are pushed to Stalwart as labelled app passwords
+  (create registers before commit; revoke removes remotely first; mailbox
+  disable clears account secrets and revokes local creds)
+- ADR-001 PoC criteria 1–3, 6 verified: provisioning via API ✓, authenticated
+  submission on 587 ✓, local delivery + retrieval (JMAP) ✓, compose container
+  with persistent storage ✓ (`go run ./cmd/mailcheck` automates the check);
+  criteria 4–5 (outbound DKIM relay, bounce signals) need the internet phase
+- Self-mail fix: `mailbox_messages` uniqueness now `(mailbox, message,
+  folder)` (migration 00017); A→A lands in Sent *and* Inbox; folder moves
+  merge duplicates
+- Observability: Message Trace (admin search + event timeline), sender
+  delivery timeline in the Reading Pane, `GET /system/infrastructure`
+  (cached; postgres/redis/nats/minio/stalwart/worker heartbeat), Admin →
+  Infrastructure page, dashboard "Needs attention" from real signals
+- Settings → Mail clients shows IMAP/SMTP connection parameters
+
 ## IN PROGRESS
 
 - (nothing mid-flight)
 
 ## NOT STARTED (deliberately deferred, with reasons)
 
-- Rspamd/ClamAV integration — after mail core (ADR-001); risk engine already
+- Webmail ↔ Stalwart message-store bridge — webmail still reads our data
+  plane (per ADR-001 boundary); mail submitted via SMTP lives in Stalwart's
+  store and is visible to IMAP/JMAP clients but not in webmail (and vice
+  versa). Requires an inbound-delivery integration decision (LMTP into our
+  pipeline vs JMAP read-through) — next mail-core phase
+- DNS verification (MX/SPF/DKIM/DMARC checks) — needs the internet phase for
+  real records; `dns`-mode domains stay pending by design
+- Rspamd/ClamAV integration — after mail core bridge; risk engine already
   exposes the Verdict seam they plug into
-- Mail core PoC (Stalwart) — Linux phase; ADR-001 fixes criteria
 - Forgot/reset password flow — design noted in SECURITY.md
 - Sending streams / reputation scoring — needs real SMTP telemetry (spec
   says don't build before internet mail)

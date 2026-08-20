@@ -130,7 +130,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Log.Debug("session created", slog.String("userID", userID), slog.String("token_prefix", token[:10]))
-	
+
 	id, err := h.Service.Resolve(r.Context(), token)
 	if err != nil {
 		h.Log.Error("session resolve failed", slog.String("userID", userID), slog.String("error", err.Error()))

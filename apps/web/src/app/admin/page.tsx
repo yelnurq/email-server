@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { API_URL, api, type AdminUser, type Department, type Domain, type Mailbox } from "@/lib/api";
+import { api, type AdminUser, type Department, type Domain, type InfraReport, type Mailbox } from "@/lib/api";
 import { useMe } from "@/components/providers";
 import { Badge, Button, Skeleton, cx } from "@/components/ui";
 import { Icon } from "@/components/icons";
@@ -79,12 +79,10 @@ export default function AdminDashboard() {
     enabled: can("audit.read"),
     refetchInterval: 60_000,
   });
-  const health = useQuery({
-    queryKey: ["health"],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/health/ready`, { cache: "no-store" });
-      return (await res.json()) as { status: string; checks: Record<string, string> };
-    },
+  const infra = useQuery({
+    queryKey: ["admin", "infrastructure"],
+    queryFn: () => api.get<InfraReport>("/api/v1/system/infrastructure"),
+    enabled: can("users.manage"),
     refetchInterval: 30_000,
     retry: false,
   });
@@ -101,7 +99,28 @@ export default function AdminDashboard() {
     redis: { label: "Cache / rate limiting", icon: "zap" },
     nats: { label: "Event bus", icon: "activity" },
     minio: { label: "Attachment storage", icon: "server" },
+    stalwart: { label: "Mail core", icon: "mail" },
+    worker: { label: "Delivery worker", icon: "send" },
   };
+  const infraDown = (infra.data?.components ?? []).filter((c) => c.status === "unavailable");
+  const infraOK = infra.isSuccess && infraDown.length === 0;
+
+  // Needs attention: only real, current signals.
+  const attention: Array<{ text: string; href: string }> = [
+    ...infraDown.map((c) => ({
+      text: `${HEALTH_LABELS[c.name]?.label ?? c.name} is unavailable`,
+      href: "/admin/infrastructure",
+    })),
+    ...domainList
+      .filter((d) => d.provisioning_status === "failed")
+      .map((d) => ({ text: `Domain ${d.name}: mail-core provisioning failed`, href: "/admin/domains" })),
+    ...(mailboxes.data?.mailboxes ?? [])
+      .filter((m) => m.provisioning_status === "failed")
+      .map((m) => ({ text: `Mailbox ${m.address}: mail-core provisioning failed`, href: "/admin/mailboxes" })),
+    ...(quarantineCount > 0
+      ? [{ text: `${quarantineCount} message${quarantineCount > 1 ? "s" : ""} held in quarantine`, href: "/admin/security" }]
+      : []),
+  ];
 
   return (
     <div>
@@ -202,30 +221,50 @@ export default function AdminDashboard() {
         )}
 
         <div className="space-y-4">
-          {/* System health — real readiness checks */}
+          {/* Needs attention — real current signals only */}
+          {attention.length > 0 && (
+            <section className="rounded-[10px] border border-warning/30 bg-warning/5">
+              <header className="border-b border-warning/20 px-4 py-2.5">
+                <h2 className="text-[13px] font-semibold text-warning">Needs attention</h2>
+              </header>
+              <ul className="divide-y divide-border/50 text-[13px]">
+                {attention.slice(0, 6).map((a, i) => (
+                  <li key={i}>
+                    <Link href={a.href} className="flex items-center gap-2.5 px-4 py-2 hover:bg-background/60">
+                      <Icon name="alert-triangle" className="h-3.5 w-3.5 shrink-0 text-warning" />
+                      <span className="min-w-0 flex-1 truncate">{a.text}</span>
+                      <Icon name="chevron-right" className="h-3 w-3 shrink-0 text-faint" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* System health — cached backend checks incl. mail core + worker */}
           <section className="rounded-[10px] border border-border bg-surface-elevated">
             <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <h2 className="text-[13px] font-semibold">System health</h2>
-              {health.isSuccess && (
-                <Badge tone={health.data.status === "ok" ? "success" : "warning"}>
-                  {health.data.status === "ok" ? "Operational" : "Degraded"}
-                </Badge>
+              {infra.isSuccess && (
+                <Badge tone={infraOK ? "success" : "warning"}>{infraOK ? "Operational" : "Degraded"}</Badge>
               )}
-              {health.isError && <Badge tone="danger">Unreachable</Badge>}
+              {infra.isError && <Badge tone="danger">Unreachable</Badge>}
             </header>
             <ul className="divide-y divide-border/70">
               {Object.entries(HEALTH_LABELS).map(([key, meta]) => {
-                const state = health.data?.checks?.[key];
+                const c = infra.data?.components.find((x) => x.name === key);
                 return (
                   <li key={key} className="flex items-center gap-3 px-4 py-2 text-[13px]">
                     <Icon name={meta.icon} className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="flex-1">{meta.label}</span>
-                    {health.isLoading ? (
+                    {infra.isLoading ? (
                       <Skeleton className="h-3 w-12" />
-                    ) : state === "ok" ? (
+                    ) : c?.status === "ok" ? (
                       <span className="inline-flex items-center gap-1.5 text-xs text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" /> OK</span>
-                    ) : state ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-danger" title={state}><span className="h-1.5 w-1.5 rounded-full bg-danger" /> Down</span>
+                    ) : c?.status === "disabled" ? (
+                      <span className="text-xs text-faint">off</span>
+                    ) : c ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-danger" title={c.detail}><span className="h-1.5 w-1.5 rounded-full bg-danger" /> Down</span>
                     ) : (
                       <span className="text-xs text-faint">unknown</span>
                     )}
@@ -233,6 +272,9 @@ export default function AdminDashboard() {
                 );
               })}
             </ul>
+            <footer className="border-t border-border px-4 py-2">
+              <Link href="/admin/infrastructure" className="text-xs font-medium text-primary hover:underline">Infrastructure details</Link>
+            </footer>
           </section>
 
           {/* Security snapshot — real counters */}

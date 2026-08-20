@@ -18,12 +18,14 @@ import (
 	"github.com/yelnurq/email-server/internal/httpx"
 	"github.com/yelnurq/email-server/internal/mailaddr"
 	"github.com/yelnurq/email-server/internal/mailbox"
+	"github.com/yelnurq/email-server/internal/mailcore"
 )
 
 type Handlers struct {
-	Pool  *pgxpool.Pool
-	Audit *audit.Logger
-	Log   *slog.Logger
+	Pool        *pgxpool.Pool
+	Audit       *audit.Logger
+	Log         *slog.Logger
+	Provisioner *mailcore.Provisioner
 }
 
 type User struct {
@@ -188,7 +190,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mailboxAddress := ""
+	mailboxAddress, mailboxID := "", ""
 	if req.MailboxDomainID != "" {
 		var domainName, domainOrgID, domainStatus string
 		err = tx.QueryRow(r.Context(), `
@@ -211,7 +213,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 			// default to the local part of the login email
 			local = email[:strings.LastIndexByte(email, '@')]
 		}
-		if _, err := mailbox.Provision(r.Context(), tx, id.TenantID, orgID, req.MailboxDomainID, domainName, userID, local); err != nil {
+		mbID, err := mailbox.Provision(r.Context(), tx, id.TenantID, orgID, req.MailboxDomainID, domainName, userID, local)
+		if err != nil {
 			if errors.Is(err, mailbox.ErrAddressTaken) {
 				httpx.Error(w, r, http.StatusConflict, "ADDRESS_TAKEN", "Mailbox address is already in use")
 				return
@@ -219,12 +222,18 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, r, http.StatusBadRequest, "INVALID_LOCAL_PART", "Invalid mailbox local part")
 			return
 		}
+		mailboxID = mbID
 		mailboxAddress = mailaddr.Join(local, domainName)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
 		httpx.Internal(w, r)
 		return
+	}
+	// Push the new mailbox account into the mail core (post-commit; failure
+	// leaves it retryable via POST /mailboxes/{id}/provision).
+	if mailboxID != "" {
+		h.Provisioner.ProvisionMailbox(r.Context(), id.TenantID, mailboxID, id.UserID)
 	}
 	h.Audit.Record(r.Context(), audit.Entry{
 		TenantID: id.TenantID, ActorUserID: id.UserID, Action: "user.create",

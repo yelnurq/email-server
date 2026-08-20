@@ -11,7 +11,8 @@ Linux-ready from day one.
 ## Stack
 
 Go (chi, pgx) · Next.js (TypeScript, Tailwind) · PostgreSQL · Redis ·
-NATS JetStream · MinIO — infrastructure runs as Linux containers.
+NATS JetStream · MinIO · **Stalwart Mail Server** (mail core: SMTP
+submission, IMAP, JMAP) — infrastructure runs as Linux containers.
 
 ## Prerequisites
 
@@ -31,7 +32,7 @@ Verified development environment (2026-08-20):
 # 1. Configuration
 cp .env.example .env            # PowerShell: Copy-Item .env.example .env
 
-# 2. Infrastructure (PostgreSQL, Redis, NATS, MinIO as Linux containers)
+# 2. Infrastructure (PostgreSQL, Redis, NATS, MinIO, Stalwart as Linux containers)
 docker compose up -d
 
 # 3. Database migrations
@@ -63,13 +64,17 @@ development-only and must not be enabled in a production build.
 With infra + API + worker running:
 
 ```bash
-bash scripts/e2e.sh
+bash scripts/e2e.sh              # Linux/macOS/Git Bash
+powershell -File scripts/e2e.ps1 # Windows without bash: runs the same suite
+                                 # in a docker:cli container against the host
 ```
 
-37 checks covering all five user journeys: send/receive/reply, aliases,
+46 checks covering all five user journeys: send/receive/reply, aliases,
 groups, attachments (incl. cross-tenant download denial), Email API with
 idempotency, webhooks with independent HMAC verification, spam/quarantine
-lifecycle, tenant isolation, RBAC and session revocation.
+lifecycle, tenant isolation, RBAC and session revocation — plus self-mail
+(A → A in both Sent and Inbox), Message Trace, infrastructure health and
+mail-core provisioning lifecycle.
 
 All commands are identical in PowerShell, Git Bash and Linux shells.
 `make up`, `make api`, `make web` etc. are available where `make` exists
@@ -80,22 +85,68 @@ All commands are identical in PowerShell, Git Bash and Linux shells.
 Host ports for PostgreSQL/Redis are shifted because this dev machine runs
 native PostgreSQL (5432) and Memurai (6379). Override in `.env`.
 
-| Service        | Host port | In container |
-|----------------|-----------|--------------|
-| Go API         | 8080      | —            |
-| Next.js        | 3000      | —            |
-| PostgreSQL     | **5433**  | 5432         |
-| Redis          | **6380**  | 6379         |
-| NATS           | 4222      | 4222         |
-| NATS monitor   | 8222      | 8222         |
-| MinIO S3       | 9000      | 9000         |
-| MinIO console  | 9001      | 9001         |
+| Service           | Host port | In container |
+|-------------------|-----------|--------------|
+| Go API            | 8080      | —            |
+| Next.js           | 3000      | —            |
+| PostgreSQL        | **5433**  | 5432         |
+| Redis             | **6380**  | 6379         |
+| NATS              | 4222      | 4222         |
+| NATS monitor      | 8222      | 8222         |
+| MinIO S3          | 9000      | 9000         |
+| MinIO console     | 9001      | 9001         |
+| Stalwart SMTP     | **2525**  | 25           |
+| Stalwart submission | **1587** | 587         |
+| Stalwart submissions (TLS) | **1465** | 465  |
+| Stalwart IMAP     | **1143**  | 143          |
+| Stalwart IMAPS    | **1993**  | 993          |
+| Stalwart HTTP (mgmt + JMAP) | **8180** | 8080 |
+
+## Mail core (Stalwart)
+
+Stalwart (pinned `v0.13.4`; config in
+[deploy/stalwart/config.toml](deploy/stalwart/config.toml), data in the
+`stalwartdata` volume) is the protocol engine behind the platform per
+[ADR-001](docs/adr/ADR-001-mail-core.md). The Go API is the control plane and
+talks to it only through the `internal/mailcore.Provider` abstraction
+(implementation: `mailcore.Stalwart`, management REST API, admin credentials
+stay in the backend). Set `MAIL_CORE_PROVIDER=none` to develop without the
+container — provisioning is then recorded as `skipped`.
+
+What is integrated:
+
+- **Provisioning lifecycle** — creating a domain/mailbox (or retrying via
+  `POST /domains/{id}/provision`, `POST /mailboxes/{id}/provision`) pushes a
+  principal into Stalwart and tracks `pending → provisioning → active |
+  failed` per row; failures keep the error and are retryable, and are audited.
+- **SMTP credentials = app passwords** — `POST /smtp-credentials` registers
+  the secret as a labelled Stalwart app password, so mail clients log in with
+  the mailbox address + that password (587 STARTTLS / 465, IMAP 143/993,
+  JMAP). Revoking removes it from Stalwart first; disabling a mailbox clears
+  all its protocol passwords.
+- **Health** — Stalwart (and the delivery worker via DB heartbeats) appear in
+  `GET /api/v1/system/infrastructure` (cached backend checks), Admin →
+  Infrastructure and the dashboard.
+
+Smoke-test the whole chain (SMTP submit → Stalwart delivery → JMAP fetch):
+
+```bash
+go run ./cmd/mailcheck -smtp localhost:1587 -http http://localhost:8180 \
+  -from admin@company.test -from-pass <smtp credential password> \
+  -to user1@company.test -to-pass <recipient credential password>
+```
+
+Webmail continues to read from the platform's own data plane (PostgreSQL);
+bridging the two message stores is the next phase (see PROJECT_STATUS).
 
 ## Health
 
 - `GET http://localhost:8080/health/live` — process is up.
 - `GET http://localhost:8080/health/ready` — dependencies (postgres, redis,
   nats, minio) are reachable; `503` with per-check detail otherwise.
+- `GET /api/v1/system/infrastructure` (admin) — cached per-component report:
+  postgres, redis, nats, minio, stalwart, delivery worker (latency, version,
+  last heartbeat).
 - The frontend start page (http://localhost:3000) visualizes these checks.
 
 ## Project layout
@@ -121,7 +172,8 @@ All endpoints under `/api/v1`, unified error envelope
 | Auth | `POST /auth/login`, `POST /auth/logout`, `GET /me`, `POST /me/password` |
 | Admin | `GET/POST /organizations`, `/domains`, `/users`, `/mailboxes`; aliases, groups (+`/{id}/members`), `/api-keys`, `/smtp-credentials`, `/webhooks` (+deliveries/retry) |
 | Security | `GET /quarantine`, `POST /quarantine/{id}/release|delete`, `GET/POST/DELETE /security/blocks`, `GET /audit` |
-| Webmail | `GET /mail/summary`, `GET /mail/messages?folder=&q=&limit=&offset=`, `GET/PATCH/DELETE /mail/messages/{id}`, `POST /mail/send`, attachments upload/download |
+| Webmail | `GET /mail/summary`, `GET /mail/messages?folder=&q=&limit=&offset=`, `GET/PATCH/DELETE /mail/messages/{id}`, `GET /mail/messages/{id}/events` (sender delivery timeline), `GET /mail/client-config`, `POST /mail/send`, attachments upload/download |
+| Operations | `GET /admin/messages?q=&status=` + `GET /admin/messages/{id}/trace` (Message Trace), `GET /system/infrastructure`, `POST /domains/{id}/provision`, `PATCH /mailboxes/{id}`, `POST /mailboxes/{id}/provision` |
 | Drafts | `POST /mail/drafts`, `PUT /mail/drafts/{id}`, `POST /mail/drafts/{id}/send` |
 | Email API | `POST /emails` (+`Idempotency-Key`), `POST /emails/batch`, `GET /emails/{id}`, `GET /emails/{id}/events` — API-key auth, see [docs/api/openapi.yaml](docs/api/openapi.yaml) |
 

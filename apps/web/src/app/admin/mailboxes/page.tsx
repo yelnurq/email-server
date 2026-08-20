@@ -1,35 +1,67 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { api, type Mailbox } from "@/lib/api";
-import { EmptyState, PageLoader } from "@/components/ui";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, ApiError, formatBytes, type Mailbox } from "@/lib/api";
+import { Badge, ConfirmDialog, EmptyState, ListSkeleton, Menu, useToast } from "@/components/ui";
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
+function ProvisioningBadge({ m }: { m: Mailbox }) {
+  switch (m.provisioning_status) {
+    case "active":
+      return <Badge tone="success">Provisioned</Badge>;
+    case "skipped":
+      return <Badge tone="neutral">No mail core</Badge>;
+    case "provisioning":
+      return <Badge tone="accent">Provisioning…</Badge>;
+    case "failed":
+      return <span title={m.provisioning_error}><Badge tone="danger">Failed</Badge></span>;
+    default:
+      return <Badge tone="neutral">Pending</Badge>;
+  }
 }
 
 export default function MailboxesPage() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [confirmDisable, setConfirmDisable] = useState<Mailbox | null>(null);
+
   const mailboxes = useQuery({
     queryKey: ["admin", "mailboxes"],
     queryFn: () => api.get<{ mailboxes: Mailbox[] }>("/api/v1/mailboxes"),
   });
 
+  const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "mailboxes"] });
+  const onApiError = (e: unknown, fallback: string) =>
+    toast("error", e instanceof ApiError ? e.message : fallback);
+
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      api.patch(`/api/v1/mailboxes/${id}`, body),
+    onSuccess: () => { refresh(); toast("success", "Mailbox updated"); },
+    onError: (e) => onApiError(e, "Could not update the mailbox"),
+  });
+
+  const provision = useMutation({
+    mutationFn: (id: string) => api.post<{ provisioning_status: string }>(`/api/v1/mailboxes/${id}/provision`),
+    onSuccess: (res) => {
+      refresh();
+      if (res.provisioning_status === "active") toast("success", "Mailbox provisioned in the mail core");
+      else toast("error", "Provisioning did not complete");
+    },
+    onError: (e) => onApiError(e, "Provisioning request failed"),
+  });
+
   return (
     <div className="space-y-6">
       <section className="mb-8">
-        <h1 className="page-title">
-          Mailboxes
-        </h1>
+        <h1 className="page-title">Mailboxes</h1>
         <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
-          Mailboxes are the receiving desks of the platform. They inherit folders automatically and
-          show capacity at a glance.
+          Every mailbox is an account in the mail core: webmail, SMTP submission and IMAP all
+          resolve to it. Disabling a mailbox revokes its mail-client passwords immediately.
         </p>
       </section>
 
-      {mailboxes.isLoading && <PageLoader label="Loading mailboxes" />}
+      {mailboxes.isLoading && <ListSkeleton rows={6} />}
       {mailboxes.isSuccess && mailboxes.data.mailboxes.length === 0 && (
         <EmptyState title="No mailboxes yet" hint="Create a user with a mailbox first." />
       )}
@@ -42,6 +74,8 @@ export default function MailboxesPage() {
                 <th className="px-4 py-3 font-medium">Owner</th>
                 <th className="px-4 py-3 font-medium">Usage</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Mail core</th>
+                <th className="px-4 py-3" aria-label="Actions" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -53,9 +87,37 @@ export default function MailboxesPage() {
                     {formatBytes(m.used_bytes)} / {formatBytes(m.quota_bytes)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {m.status}
-                    </span>
+                    <Badge tone={m.status === "active" ? "success" : "danger"}>{m.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3"><ProvisioningBadge m={m} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <Menu
+                      trigger={
+                        <button
+                          type="button"
+                          className="rounded-[6px] px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label={`Actions for ${m.address}`}
+                        >
+                          Actions
+                        </button>
+                      }
+                      items={[
+                        ...(m.status === "active"
+                          ? [{ label: "Disable mailbox", icon: "alert-octagon", danger: true, onSelect: () => setConfirmDisable(m) }]
+                          : [{ label: "Enable mailbox", icon: "check-circle", onSelect: () => patch.mutate({ id: m.id, body: { status: "active" } }) }]),
+                        ...(m.provisioning_status !== "active" && m.provisioning_status !== "skipped"
+                          ? [{ label: "Retry provisioning", icon: "refresh-cw", onSelect: () => provision.mutate(m.id) }]
+                          : []),
+                        {
+                          label: "Quota: 1 GB", icon: "database",
+                          onSelect: () => patch.mutate({ id: m.id, body: { quota_bytes: 1073741824 } }),
+                        },
+                        {
+                          label: "Quota: 5 GB", icon: "database",
+                          onSelect: () => patch.mutate({ id: m.id, body: { quota_bytes: 5368709120 } }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -63,6 +125,23 @@ export default function MailboxesPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDisable !== null}
+        title="Disable this mailbox?"
+        body={
+          confirmDisable
+            ? `${confirmDisable.address} will stop receiving mail and every issued SMTP credential for it will be revoked. Mail clients signed in with those credentials will be disconnected.`
+            : ""
+        }
+        confirmLabel="Disable mailbox"
+        danger
+        onConfirm={() => {
+          if (confirmDisable) patch.mutate({ id: confirmDisable.id, body: { status: "disabled" } });
+          setConfirmDisable(null);
+        }}
+        onCancel={() => setConfirmDisable(null)}
+      />
     </div>
   );
 }

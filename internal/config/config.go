@@ -34,6 +34,20 @@ type Config struct {
 
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
+
+	// Mail core (Stalwart) integration. Provider "none" disables the mail
+	// core: provisioning is recorded as skipped and health reports it as not
+	// configured.
+	MailCoreProvider  string // none | stalwart
+	StalwartBaseURL   string
+	StalwartAdminUser string
+	StalwartAdminPass string
+
+	// Connection parameters surfaced to users on Settings → Mail clients.
+	// These describe how mail clients reach the mail core from the outside.
+	MailClientHost     string
+	MailClientSMTPPort string
+	MailClientIMAPPort string
 }
 
 // Load reads configuration from the environment, optionally seeded by a .env
@@ -60,6 +74,15 @@ func Load() (*Config, error) {
 
 		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
 		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+
+		MailCoreProvider:  getEnv("MAIL_CORE_PROVIDER", "none"),
+		StalwartBaseURL:   os.Getenv("STALWART_BASE_URL"),
+		StalwartAdminUser: getEnv("STALWART_ADMIN_USER", "admin"),
+		StalwartAdminPass: os.Getenv("STALWART_ADMIN_PASSWORD"),
+
+		MailClientHost:     getEnv("MAIL_CLIENT_HOST", "localhost"),
+		MailClientSMTPPort: getEnv("MAIL_CLIENT_SMTP_PORT", "1587"),
+		MailClientIMAPPort: getEnv("MAIL_CLIENT_IMAP_PORT", "1993"),
 	}
 
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
@@ -83,6 +106,15 @@ func Load() (*Config, error) {
 	}
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+	}
+	switch cfg.MailCoreProvider {
+	case "none":
+	case "stalwart":
+		if cfg.StalwartBaseURL == "" || cfg.StalwartAdminPass == "" {
+			return nil, fmt.Errorf("MAIL_CORE_PROVIDER=stalwart requires STALWART_BASE_URL and STALWART_ADMIN_PASSWORD")
+		}
+	default:
+		return nil, fmt.Errorf("MAIL_CORE_PROVIDER must be none or stalwart, got %q", cfg.MailCoreProvider)
 	}
 	return cfg, nil
 }

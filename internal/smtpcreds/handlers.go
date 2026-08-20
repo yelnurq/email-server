@@ -19,12 +19,14 @@ import (
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/httpx"
+	"github.com/yelnurq/email-server/internal/mailcore"
 )
 
 type Handlers struct {
-	Pool  *pgxpool.Pool
-	Audit *audit.Logger
-	Log   *slog.Logger
+	Pool     *pgxpool.Pool
+	Audit    *audit.Logger
+	Log      *slog.Logger
+	Provider mailcore.Provider
 }
 
 type credView struct {
@@ -111,12 +113,38 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	password := "smtppw_" + strings.ToLower(enc.EncodeToString(passBuf[:]))
 	hash := sha256.Sum256([]byte(password))
 
+	tx, err := h.Pool.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
 	var credID string
-	if err := h.Pool.QueryRow(r.Context(), `
+	if err := tx.QueryRow(r.Context(), `
 		INSERT INTO smtp_credentials (tenant_id, organization_id, mailbox_id, username, secret_hash, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
 		id.TenantID, mailboxOrgID, req.MailboxID, username, hash[:], id.UserID).Scan(&credID); err != nil {
 		h.Log.Error("smtp cred create failed", slog.String("error", err.Error()))
+		httpx.Internal(w, r)
+		return
+	}
+	// Register the password as a labelled app password in the mail core
+	// before committing, so a credential never exists locally without being
+	// usable for SMTP/IMAP login. The label is the username, which lets
+	// revocation remove exactly this password later.
+	if h.Provider.Enabled() {
+		if err := h.Provider.AddAppPassword(r.Context(), mailboxAddress, username, password); err != nil {
+			h.Log.Error("mail core app password registration failed", slog.String("error", err.Error()))
+			httpx.Error(w, r, http.StatusBadGateway, "MAIL_CORE_UNAVAILABLE",
+				"The mail service did not accept the credential; no credential was created")
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		// Roll the mail core back so no orphaned password remains.
+		if h.Provider.Enabled() {
+			_ = h.Provider.RemoveAppPassword(r.Context(), mailboxAddress, username)
+		}
 		httpx.Internal(w, r)
 		return
 	}
@@ -131,20 +159,47 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		"username": username,
 		// Shown exactly once; never retrievable again.
 		"password": password,
+		// Protocol clients authenticate with the mailbox address as login.
+		"smtp_login": mailboxAddress,
 	})
 }
 
-// Revoke disables a credential permanently.
+// Revoke disables a credential permanently, removing its app password from
+// the mail core first so no revoked credential keeps protocol access.
 func (h *Handlers) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := auth.IdentityFrom(r.Context())
 	credID := chi.URLParam(r, "id")
-	query := `UPDATE smtp_credentials SET status = 'revoked' WHERE id = $1 AND tenant_id = $2`
-	args := []any{credID, id.TenantID}
-	if !id.TenantWide() {
-		query += ` AND organization_id = $3`
-		args = append(args, id.OrganizationID)
+
+	var username, mailboxAddress, orgID string
+	err := h.Pool.QueryRow(r.Context(), `
+		SELECT c.username::text, m.address::text, c.organization_id
+		FROM smtp_credentials c
+		JOIN mailboxes m ON m.id = c.mailbox_id
+		WHERE c.id = $1 AND c.tenant_id = $2`, credID, id.TenantID).
+		Scan(&username, &mailboxAddress, &orgID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, "CREDENTIAL_NOT_FOUND", "SMTP credential not found")
+		return
 	}
-	ct, err := h.Pool.Exec(r.Context(), query, args...)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if !id.TenantWide() && orgID != id.OrganizationID {
+		httpx.Error(w, r, http.StatusNotFound, "CREDENTIAL_NOT_FOUND", "SMTP credential not found")
+		return
+	}
+	if h.Provider.Enabled() {
+		if err := h.Provider.RemoveAppPassword(r.Context(), mailboxAddress, username); err != nil {
+			h.Log.Error("mail core app password removal failed", slog.String("error", err.Error()))
+			httpx.Error(w, r, http.StatusBadGateway, "MAIL_CORE_UNAVAILABLE",
+				"The mail service did not confirm the revocation; the credential is still active")
+			return
+		}
+	}
+	ct, err := h.Pool.Exec(r.Context(),
+		`UPDATE smtp_credentials SET status = 'revoked' WHERE id = $1 AND tenant_id = $2`,
+		credID, id.TenantID)
 	if err != nil {
 		httpx.Internal(w, r)
 		return

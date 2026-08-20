@@ -7,34 +7,42 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/httpx"
 	"github.com/yelnurq/email-server/internal/mailaddr"
+	"github.com/yelnurq/email-server/internal/mailcore"
 )
 
 type Handlers struct {
-	Pool  *pgxpool.Pool
-	Audit *audit.Logger
-	Log   *slog.Logger
+	Pool        *pgxpool.Pool
+	Audit       *audit.Logger
+	Log         *slog.Logger
+	Provisioner *mailcore.Provisioner
 }
 
 type Domain struct {
-	ID               string `json:"id"`
-	OrganizationID   string `json:"organization_id"`
-	Name             string `json:"name"`
-	Status           string `json:"status"`
-	VerificationMode string `json:"verification_mode"`
-	CreatedAt        string `json:"created_at"`
+	ID                 string  `json:"id"`
+	OrganizationID     string  `json:"organization_id"`
+	Name               string  `json:"name"`
+	Status             string  `json:"status"`
+	VerificationMode   string  `json:"verification_mode"`
+	ProvisioningStatus string  `json:"provisioning_status"`
+	ProvisioningError  string  `json:"provisioning_error,omitempty"`
+	ProvisionedAt      *string `json:"provisioned_at,omitempty"`
+	CreatedAt          string  `json:"created_at"`
 }
 
 // List returns the tenant's domains (org-scoped admins: their org only).
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id := auth.IdentityFrom(r.Context())
 	query := `
-		SELECT id, organization_id, name, status, verification_mode, created_at::text
+		SELECT id, organization_id, name, status, verification_mode,
+		       provisioning_status, provisioning_error, provisioned_at::text,
+		       created_at::text
 		FROM domains WHERE tenant_id = $1`
 	args := []any{id.TenantID}
 	if !id.TenantWide() {
@@ -52,7 +60,8 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	out := []Domain{}
 	for rows.Next() {
 		var d Domain
-		if err := rows.Scan(&d.ID, &d.OrganizationID, &d.Name, &d.Status, &d.VerificationMode, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.OrganizationID, &d.Name, &d.Status, &d.VerificationMode,
+			&d.ProvisioningStatus, &d.ProvisioningError, &d.ProvisionedAt, &d.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -131,5 +140,30 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		ResourceType: "domain", ResourceID: d.ID,
 		Detail: map[string]any{"name": d.Name, "mode": mode},
 	})
+	// Push the domain into the mail core. A failure does not undo the local
+	// record: the domain stays with provisioning_status=failed and can be
+	// retried via POST /domains/{id}/provision.
+	d.ProvisioningStatus = h.Provisioner.ProvisionDomain(r.Context(), id.TenantID, d.ID, id.UserID)
 	httpx.JSON(w, http.StatusCreated, d)
+}
+
+// Provision retries pushing a domain into the mail core.
+func (h *Handlers) Provision(w http.ResponseWriter, r *http.Request) {
+	id := auth.IdentityFrom(r.Context())
+	domainID := chi.URLParam(r, "id")
+
+	var orgID string
+	err := h.Pool.QueryRow(r.Context(),
+		`SELECT organization_id FROM domains WHERE id = $1 AND tenant_id = $2`,
+		domainID, id.TenantID).Scan(&orgID)
+	if err != nil {
+		httpx.Error(w, r, http.StatusNotFound, "DOMAIN_NOT_FOUND", "Domain not found")
+		return
+	}
+	if !id.TenantWide() && orgID != id.OrganizationID {
+		httpx.Error(w, r, http.StatusForbidden, "FORBIDDEN", "Cannot manage another organization")
+		return
+	}
+	status := h.Provisioner.ProvisionDomain(r.Context(), id.TenantID, domainID, id.UserID)
+	httpx.JSON(w, http.StatusOK, map[string]string{"provisioning_status": status})
 }

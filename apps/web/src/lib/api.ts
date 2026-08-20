@@ -167,6 +167,7 @@ export type Organization = { id: string; name: string; slug: string; status: str
 export type Domain = {
   id: string; organization_id: string; name: string; status: string;
   verification_mode: string; created_at: string;
+  provisioning_status: string; provisioning_error?: string; provisioned_at?: string;
 };
 export type AdminUser = {
   id: string; organization_id?: string; email: string; display_name: string;
@@ -185,6 +186,42 @@ export type DirectoryUser = {
 export type Mailbox = {
   id: string; organization_id: string; domain_id: string; user_id?: string; user_email?: string;
   address: string; status: string; quota_bytes: number; used_bytes: number; created_at: string;
+  provisioning_status: string; provisioning_error?: string;
+};
+
+// ---- Operations: infrastructure health and message trace ----
+
+export type InfraComponent = {
+  name: string; status: "ok" | "unavailable" | "disabled";
+  latency_ms: number; version?: string; detail?: string;
+};
+export type InfraReport = { components: InfraComponent[]; checked_at: string };
+
+export type TraceListItem = {
+  message_id: string; from: string; from_display: string; subject: string;
+  status: string; recipients: number; size_bytes: number; created_at: string;
+};
+export type TraceRecipient = {
+  kind: string; address: string; status: string; error?: string; mailbox?: string;
+};
+export type TraceEvent = { type: string; detail: Record<string, unknown>; created_at: string };
+export type MessageTrace = {
+  message_id: string; from: string; from_display: string; subject: string; status: string;
+  size_bytes: number; has_attachments: boolean; created_at: string; sent_at?: string;
+  recipients: TraceRecipient[]; events: TraceEvent[];
+};
+
+export type DeliveryEvents = {
+  status: string;
+  recipients: Array<{ address: string; status: string; error?: string }>;
+  events: Array<{ type: string; created_at: string }>;
+};
+
+export type MailClientConfig = {
+  enabled: boolean;
+  imap: { host: string; port: string; encryption: string };
+  smtp: { host: string; port: string; encryption: string };
+  login_hint: string;
 };
 
 export function formatDate(iso: string): string {

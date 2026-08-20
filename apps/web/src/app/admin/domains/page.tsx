@@ -3,7 +3,36 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type Domain, type Organization } from "@/lib/api";
-import { Button, EmptyState, Input, PageLoader, useToast } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, PageLoader, useToast } from "@/components/ui";
+
+// Mail-core provisioning state of a domain. "failed" keeps the error in a
+// tooltip and offers a retry; "skipped" means no mail core is configured.
+function ProvisioningBadge({ d, onRetry, retrying }: { d: Domain; onRetry: () => void; retrying: boolean }) {
+  switch (d.provisioning_status) {
+    case "active":
+      return <Badge tone="success">Provisioned</Badge>;
+    case "skipped":
+      return <Badge tone="neutral">No mail core</Badge>;
+    case "provisioning":
+      return <Badge tone="accent">Provisioning…</Badge>;
+    case "failed":
+      return (
+        <span className="inline-flex items-center gap-2" title={d.provisioning_error}>
+          <Badge tone="danger">Failed</Badge>
+          <button
+            type="button"
+            className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            {retrying ? "Retrying…" : "Retry"}
+          </button>
+        </span>
+      );
+    default:
+      return <Badge tone="neutral">Pending</Badge>;
+  }
+}
 
 export default function DomainsPage() {
   const qc = useQueryClient();
@@ -21,6 +50,16 @@ export default function DomainsPage() {
   });
 
   const orgName = (id: string) => orgs.data?.organizations.find((o) => o.id === id)?.name ?? id.slice(0, 8);
+
+  const provision = useMutation({
+    mutationFn: (id: string) => api.post<{ provisioning_status: string }>(`/api/v1/domains/${id}/provision`),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["admin", "domains"] });
+      if (res.provisioning_status === "active") toast("success", "Domain provisioned in the mail core");
+      else toast("error", "Provisioning did not complete; see the domain row for details");
+    },
+    onError: () => toast("error", "Provisioning request failed"),
+  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -98,7 +137,8 @@ export default function DomainsPage() {
                 <th className="px-4 py-3 font-medium">Domain</th>
                 <th className="px-4 py-3 font-medium">Organization</th>
                 <th className="px-4 py-3 font-medium">Mode</th>
-                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Verification</th>
+                <th className="px-4 py-3 font-medium">Mail core</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -108,9 +148,14 @@ export default function DomainsPage() {
                   <td className="px-4 py-3 text-muted-foreground">{orgName(d.organization_id)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{d.verification_mode}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {d.status}
-                    </span>
+                    <Badge tone={d.status === "verified" ? "success" : "neutral"}>{d.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ProvisioningBadge
+                      d={d}
+                      onRetry={() => provision.mutate(d.id)}
+                      retrying={provision.isPending && provision.variables === d.id}
+                    />
                   </td>
                 </tr>
               ))}

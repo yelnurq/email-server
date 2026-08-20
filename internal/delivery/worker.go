@@ -108,7 +108,9 @@ var errPermanent = errors.New("permanent failure")
 
 // deliver routes one accepted message. Fully idempotent: redelivery skips
 // recipients that are no longer pending and mailbox copies conflict-away on
-// the (mailbox_id, message_id) unique constraint.
+// the (mailbox_id, message_id, folder_id) unique constraint. The folder is
+// part of the key so a self-addressed message can hold both the sender's
+// Sent copy and the delivered Inbox copy in the same mailbox.
 func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	tx, err := w.Pool.Begin(ctx)
 	if err != nil {
@@ -386,7 +388,7 @@ func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, mes
 	ct, err := tx.Exec(ctx, `
 		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (mailbox_id, message_id) DO NOTHING`,
+		ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
 		mailboxID, messageID, inboxID)
 	if err != nil {
 		return false, "", err
