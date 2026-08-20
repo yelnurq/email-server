@@ -19,11 +19,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/yelnurq/email-server/internal/aliases"
+	"github.com/yelnurq/email-server/internal/apikeys"
 	"github.com/yelnurq/email-server/internal/attachments"
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/domains"
+	"github.com/yelnurq/email-server/internal/emailapi"
 	"github.com/yelnurq/email-server/internal/events"
 	"github.com/yelnurq/email-server/internal/groups"
 	"github.com/yelnurq/email-server/internal/logging"
@@ -134,6 +136,13 @@ func run() error {
 	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	aliasHandlers := &aliases.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	emailAPI := &emailapi.Handlers{
+		Pool: pool,
+		Keys: &apikeys.Service{Pool: pool},
+		Svc:  messageService,
+		Log:  log,
+	}
 
 	deps := server.Deps{
 		Log:         log,
@@ -177,6 +186,26 @@ func run() error {
 					mbadmin.Post("/groups/{id}/members", groupHandlers.UpdateMembers)
 					mbadmin.Delete("/groups/{id}", groupHandlers.Delete)
 				})
+
+				admin.Group(func(keys chi.Router) {
+					keys.Use(auth.RequirePermission("apikeys.manage"))
+					keys.Get("/api-keys", apikeyHandlers.List)
+					keys.Post("/api-keys", apikeyHandlers.Create)
+					keys.Delete("/api-keys/{id}", apikeyHandlers.Revoke)
+				})
+			})
+
+			// Developer Email API: authenticated by API key, not session.
+			v1.Group(func(emails chi.Router) {
+				emails.Use(emailAPI.RequireAPIKey)
+				emails.With(emailapi.RequireScope("emails.send")).
+					Post("/emails", emailAPI.Send)
+				emails.With(emailapi.RequireScope("emails.send")).
+					Post("/emails/batch", emailAPI.SendBatch)
+				emails.With(emailapi.RequireScope("emails.read")).
+					Get("/emails/{id}", emailAPI.Get)
+				emails.With(emailapi.RequireScope("emails.read")).
+					Get("/emails/{id}/events", emailAPI.Events)
 			})
 
 			v1.Group(func(mail chi.Router) {

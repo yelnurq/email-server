@@ -149,6 +149,25 @@ func makeSnippet(text string) string {
 // public message id. The whole operation is one transaction: message,
 // recipients, the sender's Sent copy, the accepted event and the outbox row.
 func (s *Service) Accept(ctx context.Context, tenantID string, sender *SenderMailbox, senderDisplay string, in SendInput) (string, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	publicID, err := s.AcceptInTx(ctx, tx, tenantID, sender, senderDisplay, in)
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return publicID, nil
+}
+
+// AcceptInTx is Accept inside a caller-owned transaction (used by the Email
+// API to combine acceptance with idempotency bookkeeping atomically).
+func (s *Service) AcceptInTx(ctx context.Context, tx pgx.Tx, tenantID string, sender *SenderMailbox, senderDisplay string, in SendInput) (string, error) {
 	to, cc, bcc, err := normalizeRecipients(in)
 	if err != nil {
 		return "", err
@@ -156,22 +175,11 @@ func (s *Service) Accept(ctx context.Context, tenantID string, sender *SenderMai
 	if err := validateContent(in.Subject, in.Text); err != nil {
 		return "", err
 	}
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return "", err
+	if len(in.HTML) > MaxBodyBytes {
+		return "", &ValidationError{Msg: "message html body too large"}
 	}
-	defer tx.Rollback(ctx)
-
-	publicID, msgID, err := s.insertAccepted(ctx, tx, tenantID, sender, senderDisplay, in, to, cc, bcc)
-	if err != nil {
-		return "", err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return "", err
-	}
-	_ = msgID
-	return publicID, nil
+	publicID, _, err := s.insertAccepted(ctx, tx, tenantID, sender, senderDisplay, in, to, cc, bcc)
+	return publicID, err
 }
 
 // insertAccepted writes an accepted message inside tx and returns ids.
@@ -211,13 +219,17 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 	if snippetSource == "" {
 		snippetSource = in.HTML
 	}
+	var orgID *string
+	if sender.OrgID != "" {
+		orgID = &sender.OrgID
+	}
 	err = tx.QueryRow(ctx, `
-		INSERT INTO messages (public_id, tenant_id, thread_id, rfc_message_id, in_reply_to,
-		                      references_ids, from_address, from_display, subject, snippet,
-		                      body_text, body_html, size_bytes, status, sent_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'accepted', now())
+		INSERT INTO messages (public_id, tenant_id, organization_id, thread_id, rfc_message_id,
+		                      in_reply_to, references_ids, from_address, from_display, subject,
+		                      snippet, body_text, body_html, size_bytes, status, sent_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'accepted', now())
 		RETURNING id`,
-		publicID, tenantID, threadID, rfcID, inReplyToRFC, referencesIDs,
+		publicID, tenantID, orgID, threadID, rfcID, inReplyToRFC, referencesIDs,
 		sender.Address, senderDisplay, in.Subject, makeSnippet(snippetSource),
 		in.Text, in.HTML, size).Scan(&msgID)
 	if err != nil {
