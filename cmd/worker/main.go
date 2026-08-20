@@ -16,6 +16,7 @@ import (
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/delivery"
 	"github.com/yelnurq/email-server/internal/logging"
+	"github.com/yelnurq/email-server/internal/webhooks"
 )
 
 func main() {
@@ -51,10 +52,29 @@ func run() error {
 	}
 	defer nc.Drain()
 
+	dispatcher := &webhooks.Dispatcher{Pool: pool, NATS: nc, Log: log}
+	dispatchErr := make(chan error, 1)
+	go func() {
+		if err := dispatcher.Run(ctx); err != nil && ctx.Err() == nil {
+			dispatchErr <- err
+		}
+	}()
+
 	w := &delivery.Worker{Pool: pool, NATS: nc, Log: log}
 	log.Info("worker started")
-	if err := w.Run(ctx); err != nil {
+	workerErr := make(chan error, 1)
+	go func() {
+		if err := w.Run(ctx); err != nil && ctx.Err() == nil {
+			workerErr <- err
+		}
+	}()
+
+	select {
+	case err := <-dispatchErr:
 		return err
+	case err := <-workerErr:
+		return err
+	case <-ctx.Done():
 	}
 	log.Info("worker shutting down")
 	return nil

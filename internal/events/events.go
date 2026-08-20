@@ -27,9 +27,21 @@ const (
 
 // AcceptedPayload is the body of an email.accepted event.
 type AcceptedPayload struct {
-	MessageID string `json:"message_id"` // internal uuid
-	PublicID  string `json:"public_id"`
-	TenantID  string `json:"tenant_id"`
+	MessageID      string `json:"message_id"` // internal uuid
+	PublicID       string `json:"public_id"`
+	TenantID       string `json:"tenant_id"`
+	OrganizationID string `json:"organization_id,omitempty"`
+}
+
+// DeliveryPayload is the body of email.delivered_local / email.failed events.
+type DeliveryPayload struct {
+	MessageID      string `json:"message_id"` // internal uuid
+	PublicID       string `json:"public_id"`
+	TenantID       string `json:"tenant_id"`
+	OrganizationID string `json:"organization_id,omitempty"`
+	RecipientID    string `json:"recipient_id"`
+	Status         string `json:"status"`
+	Error          string `json:"error,omitempty"`
 }
 
 // EnsureStream creates or updates the EMAIL stream. Idempotent.

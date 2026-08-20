@@ -307,6 +307,7 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 	}
 	if err := events.Enqueue(ctx, tx, events.SubjectAccepted, events.AcceptedPayload{
 		MessageID: msgID, PublicID: publicID, TenantID: tenantID,
+		OrganizationID: sender.OrgID,
 	}); err != nil {
 		return "", "", err
 	}

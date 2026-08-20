@@ -36,6 +36,7 @@ import (
 	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/tenant"
 	"github.com/yelnurq/email-server/internal/users"
+	"github.com/yelnurq/email-server/internal/webhooks"
 )
 
 func main() {
@@ -137,6 +138,7 @@ func run() error {
 	aliasHandlers := &aliases.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	webhookHandlers := &webhooks.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	emailAPI := &emailapi.Handlers{
 		Pool: pool,
 		Keys: &apikeys.Service{Pool: pool},
@@ -192,6 +194,16 @@ func run() error {
 					keys.Get("/api-keys", apikeyHandlers.List)
 					keys.Post("/api-keys", apikeyHandlers.Create)
 					keys.Delete("/api-keys/{id}", apikeyHandlers.Revoke)
+				})
+
+				admin.Group(func(hooks chi.Router) {
+					hooks.Use(auth.RequirePermission("webhooks.manage"))
+					hooks.Get("/webhooks", webhookHandlers.List)
+					hooks.Post("/webhooks", webhookHandlers.Create)
+					hooks.Patch("/webhooks/{id}", webhookHandlers.Patch)
+					hooks.Delete("/webhooks/{id}", webhookHandlers.Delete)
+					hooks.Get("/webhooks/{id}/deliveries", webhookHandlers.Deliveries)
+					hooks.Post("/webhooks/{id}/deliveries/{deliveryID}/retry", webhookHandlers.Retry)
 				})
 			})
 

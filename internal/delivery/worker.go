@@ -115,11 +115,12 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	defer tx.Rollback(ctx)
 
 	var size int64
-	var status, fromAddress string
+	var status, fromAddress, msgOrgID string
 	err = tx.QueryRow(ctx, `
-		SELECT size_bytes, status, from_address::text FROM messages
+		SELECT size_bytes, status, from_address::text, COALESCE(organization_id::text, '')
+		FROM messages
 		WHERE id = $1 AND tenant_id = $2
-		FOR UPDATE`, p.MessageID, p.TenantID).Scan(&size, &status, &fromAddress)
+		FOR UPDATE`, p.MessageID, p.TenantID).Scan(&size, &status, &fromAddress, &msgOrgID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errPermanent // message vanished; never deliverable
 	}
@@ -169,7 +170,7 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 			if policyReason != "" {
 				reason = policyReason
 			}
-			if err := w.finishRecipient(ctx, tx, p.MessageID, r.id, "", "failed", reason); err != nil {
+			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, "", "failed", reason); err != nil {
 				return err
 			}
 			continue
@@ -188,11 +189,11 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 			}
 		}
 		if deliveredTo != "" {
-			if err := w.finishRecipient(ctx, tx, p.MessageID, r.id, deliveredTo, "delivered", ""); err != nil {
+			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, deliveredTo, "delivered", ""); err != nil {
 				return err
 			}
 		} else {
-			if err := w.finishRecipient(ctx, tx, p.MessageID, r.id, "", "failed", lastErr); err != nil {
+			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, "", "failed", lastErr); err != nil {
 				return err
 			}
 		}
@@ -339,7 +340,7 @@ func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, mes
 	return true, "", nil
 }
 
-func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, messageID, recipientID, mailboxID, status, errMsg string) error {
+func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, mailboxID, status, errMsg string) error {
 	var mb *string
 	if mailboxID != "" {
 		mb = &mailboxID
@@ -358,11 +359,12 @@ func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, messageID, reci
 	raw, _ := json.Marshal(detail)
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO message_events (message_id, type, detail) VALUES ($1, $2, $3)`,
-		messageID, eventType, raw); err != nil {
+		p.MessageID, eventType, raw); err != nil {
 		return err
 	}
-	return events.Enqueue(ctx, tx, eventType, map[string]any{
-		"message_id": messageID, "recipient_id": recipientID, "status": status,
+	return events.Enqueue(ctx, tx, eventType, events.DeliveryPayload{
+		MessageID: p.MessageID, PublicID: p.PublicID, TenantID: p.TenantID,
+		OrganizationID: orgID, RecipientID: recipientID, Status: status, Error: errMsg,
 	})
 }
 
