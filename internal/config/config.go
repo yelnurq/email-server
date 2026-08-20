@@ -28,6 +28,11 @@ type Config struct {
 
 	LogLevel  string
 	LogFormat string
+
+	CookieSecure bool
+
+	BootstrapAdminEmail    string
+	BootstrapAdminPassword string
 }
 
 // Load reads configuration from the environment, optionally seeded by a .env
@@ -48,6 +53,11 @@ func Load() (*Config, error) {
 		S3Region:    getEnv("S3_REGION", "us-east-1"),
 		LogLevel:    getEnv("LOG_LEVEL", "info"),
 		LogFormat:   getEnv("LOG_FORMAT", "json"),
+
+		CookieSecure: getEnv("COOKIE_SECURE", "false") == "true",
+
+		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
 	}
 
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {

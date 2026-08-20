@@ -10,7 +10,7 @@ import (
 
 func newTestHandler(h *HealthChecker) http.Handler {
 	log := slog.New(slog.NewTextHandler(nopWriter{}, nil))
-	return New(log, h, nil)
+	return New(Deps{Log: log, Health: h})
 }
 
 type nopWriter struct{}

@@ -16,9 +16,12 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/yelnurq/email-server/internal/audit"
+	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/server"
+	"github.com/yelnurq/email-server/internal/tenant"
 )
 
 func main() {
@@ -65,6 +68,24 @@ func run() error {
 	}
 	defer nc.Drain()
 
+	// One-time bootstrap of the first tenant/org/admin on an empty database.
+	if err := tenant.Bootstrap(ctx, pool, log, tenant.BootstrapConfig{
+		AdminEmail:    cfg.BootstrapAdminEmail,
+		AdminPassword: cfg.BootstrapAdminPassword,
+	}); err != nil {
+		return err
+	}
+
+	auditLog := &audit.Logger{Pool: pool, Log: log}
+	authService := &auth.Service{Pool: pool}
+	authHandlers := &auth.Handlers{
+		Service:      authService,
+		Limiter:      auth.NewLoginLimiter(rdb),
+		Audit:        auditLog,
+		Log:          log,
+		CookieSecure: cfg.CookieSecure,
+	}
+
 	health := &server.HealthChecker{
 		Pool:        pool,
 		Redis:       rdb,
@@ -72,9 +93,17 @@ func run() error {
 		S3HealthURL: strings.TrimRight(cfg.S3Endpoint, "/") + "/minio/health/live",
 	}
 
+	deps := server.Deps{
+		Log:         log,
+		Health:      health,
+		CORSOrigins: cfg.CORSAllowedOrigins,
+		AuthService: authService,
+		Auth:        authHandlers,
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.APIAddr,
-		Handler:           server.New(log, health, cfg.CORSAllowedOrigins),
+		Handler:           server.New(deps),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
