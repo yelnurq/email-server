@@ -1,0 +1,83 @@
+# Mail Platform — local development infrastructure (Phase 1).
+#
+# All infrastructure runs as Linux containers so the same file works on
+# Docker Desktop (Windows/WSL2) today and on Linux Docker Engine later.
+# Host ports are shifted (5433/6380) to avoid clashing with natively
+# installed PostgreSQL/Memurai on the development machine; override via .env.
+
+name: mail-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mailplatform-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailplatform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailplatform_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-mailplatform}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailplatform} -d ${POSTGRES_DB:-mailplatform}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailplatform-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: mailplatform-nats
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+    volumes:
+      - natsdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: mailplatform-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin_dev}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  natsdata:
+  miniodata:
