@@ -1,8 +1,5 @@
-// Command worker runs the Mail Platform background processor.
-//
-// Milestone 1: it verifies connectivity to PostgreSQL and NATS and waits for
-// shutdown. The mail pipeline consumers (mail.accepted → routing → local
-// delivery) are added in Milestone 4.
+// Command worker runs the Mail Platform background processor: the local
+// delivery consumer (email.accepted → routing → mailbox delivery).
 package main
 
 import (
@@ -17,6 +14,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/yelnurq/email-server/internal/config"
+	"github.com/yelnurq/email-server/internal/delivery"
 	"github.com/yelnurq/email-server/internal/logging"
 )
 
@@ -53,9 +51,11 @@ func run() error {
 	}
 	defer nc.Drain()
 
-	log.Info("worker started; no consumers registered yet (mail pipeline arrives in Milestone 4)")
-
-	<-ctx.Done()
+	w := &delivery.Worker{Pool: pool, NATS: nc, Log: log}
+	log.Info("worker started")
+	if err := w.Run(ctx); err != nil {
+		return err
+	}
 	log.Info("worker shutting down")
 	return nil
 }

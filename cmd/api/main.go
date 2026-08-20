@@ -22,8 +22,10 @@ import (
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/domains"
+	"github.com/yelnurq/email-server/internal/events"
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailbox"
+	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/organization"
 	"github.com/yelnurq/email-server/internal/server"
 	"github.com/yelnurq/email-server/internal/tenant"
@@ -99,6 +101,17 @@ func run() error {
 		S3HealthURL: strings.TrimRight(cfg.S3Endpoint, "/") + "/minio/health/live",
 	}
 
+	// Mail-plane topology and the transactional outbox publisher.
+	if err := events.EnsureStream(nc); err != nil {
+		log.Warn("could not ensure NATS stream at startup; publisher will retry",
+			slog.String("error", err.Error()))
+	}
+	publisher := &events.Publisher{Pool: pool, NATS: nc, Log: log}
+	go publisher.Run(ctx)
+
+	messageService := &messages.Service{Pool: pool}
+	webmail := &messages.WebmailHandlers{Svc: messageService, Log: log}
+
 	orgHandlers := &organization.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log}
@@ -133,6 +146,26 @@ func run() error {
 					Get("/mailboxes", mailboxHandlers.List)
 				admin.With(auth.RequirePermission("mailboxes.manage")).
 					Post("/mailboxes", mailboxHandlers.Create)
+			})
+
+			v1.Group(func(mail chi.Router) {
+				mail.Use(auth.RequireAuth)
+				mail.Use(auth.RequirePermission("mail.read"))
+
+				mail.Get("/mail/summary", webmail.Summary)
+				mail.Get("/mail/messages", webmail.List)
+				mail.Get("/mail/messages/{id}", webmail.Get)
+				mail.Patch("/mail/messages/{id}", webmail.Patch)
+				mail.Delete("/mail/messages/{id}", webmail.Delete)
+
+				mail.With(auth.RequirePermission("mail.send")).
+					Post("/mail/send", webmail.Send)
+				mail.With(auth.RequirePermission("mail.send")).
+					Post("/mail/drafts", webmail.CreateDraft)
+				mail.With(auth.RequirePermission("mail.send")).
+					Put("/mail/drafts/{id}", webmail.UpdateDraft)
+				mail.With(auth.RequirePermission("mail.send")).
+					Post("/mail/drafts/{id}/send", webmail.SendDraft)
 			})
 		},
 	}
