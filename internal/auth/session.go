@@ -40,6 +40,18 @@ type RoleGrant struct {
 	ScopeID   string `json:"scope_id,omitempty"`
 }
 
+// TenantWide reports whether the identity holds any platform- or
+// tenant-scoped role, i.e. may administer every organization in its tenant.
+// Organization-scoped admins are limited to their own organization.
+func (id *Identity) TenantWide() bool {
+	for _, g := range id.Roles {
+		if g.ScopeType == "platform" || g.ScopeType == "tenant" {
+			return true
+		}
+	}
+	return false
+}
+
 // HasPermission reports whether the identity holds a permission at any scope.
 // Scope-narrowing (tenant/organization ownership of the target resource) is
 // enforced by handlers via tenant-scoped queries.

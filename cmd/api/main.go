@@ -16,12 +16,18 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
+	"github.com/yelnurq/email-server/internal/domains"
 	"github.com/yelnurq/email-server/internal/logging"
+	"github.com/yelnurq/email-server/internal/mailbox"
+	"github.com/yelnurq/email-server/internal/organization"
 	"github.com/yelnurq/email-server/internal/server"
 	"github.com/yelnurq/email-server/internal/tenant"
+	"github.com/yelnurq/email-server/internal/users"
 )
 
 func main() {
@@ -93,12 +99,42 @@ func run() error {
 		S3HealthURL: strings.TrimRight(cfg.S3Endpoint, "/") + "/minio/health/live",
 	}
 
+	orgHandlers := &organization.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log}
+
 	deps := server.Deps{
 		Log:         log,
 		Health:      health,
 		CORSOrigins: cfg.CORSAllowedOrigins,
 		AuthService: authService,
 		Auth:        authHandlers,
+		APIRoutes: func(v1 chi.Router) {
+			v1.Group(func(admin chi.Router) {
+				admin.Use(auth.RequireAuth)
+
+				admin.With(auth.RequirePermission("organizations.manage")).
+					Get("/organizations", orgHandlers.List)
+				admin.With(auth.RequirePermission("organizations.manage")).
+					Post("/organizations", orgHandlers.Create)
+
+				admin.With(auth.RequirePermission("domains.manage")).
+					Get("/domains", domainHandlers.List)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Post("/domains", domainHandlers.Create)
+
+				admin.With(auth.RequirePermission("users.manage")).
+					Get("/users", userHandlers.List)
+				admin.With(auth.RequirePermission("users.manage")).
+					Post("/users", userHandlers.Create)
+
+				admin.With(auth.RequirePermission("mailboxes.manage")).
+					Get("/mailboxes", mailboxHandlers.List)
+				admin.With(auth.RequirePermission("mailboxes.manage")).
+					Post("/mailboxes", mailboxHandlers.Create)
+			})
+		},
 	}
 
 	srv := &http.Server{
