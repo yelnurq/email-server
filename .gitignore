@@ -1,0 +1,29 @@
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Node / Next.js
+node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+npm-debug.log*
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local data
+/data/
+/tmp/
