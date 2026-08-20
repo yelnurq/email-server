@@ -18,11 +18,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/yelnurq/email-server/internal/aliases"
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/domains"
 	"github.com/yelnurq/email-server/internal/events"
+	"github.com/yelnurq/email-server/internal/groups"
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailbox"
 	"github.com/yelnurq/email-server/internal/messages"
@@ -116,6 +118,8 @@ func run() error {
 	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	aliasHandlers := &aliases.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
 
 	deps := server.Deps{
 		Log:         log,
@@ -146,6 +150,19 @@ func run() error {
 					Get("/mailboxes", mailboxHandlers.List)
 				admin.With(auth.RequirePermission("mailboxes.manage")).
 					Post("/mailboxes", mailboxHandlers.Create)
+
+				admin.Group(func(mbadmin chi.Router) {
+					mbadmin.Use(auth.RequirePermission("mailboxes.manage"))
+					mbadmin.Get("/aliases", aliasHandlers.List)
+					mbadmin.Post("/aliases", aliasHandlers.Create)
+					mbadmin.Patch("/aliases/{id}", aliasHandlers.Patch)
+					mbadmin.Delete("/aliases/{id}", aliasHandlers.Delete)
+
+					mbadmin.Get("/groups", groupHandlers.List)
+					mbadmin.Post("/groups", groupHandlers.Create)
+					mbadmin.Post("/groups/{id}/members", groupHandlers.UpdateMembers)
+					mbadmin.Delete("/groups/{id}", groupHandlers.Delete)
+				})
 			})
 
 			v1.Group(func(mail chi.Router) {

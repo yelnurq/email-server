@@ -115,10 +115,11 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	defer tx.Rollback(ctx)
 
 	var size int64
-	var status string
+	var status, fromAddress string
 	err = tx.QueryRow(ctx, `
-		SELECT size_bytes, status FROM messages WHERE id = $1 AND tenant_id = $2
-		FOR UPDATE`, p.MessageID, p.TenantID).Scan(&size, &status)
+		SELECT size_bytes, status, from_address::text FROM messages
+		WHERE id = $1 AND tenant_id = $2
+		FOR UPDATE`, p.MessageID, p.TenantID).Scan(&size, &status, &fromAddress)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errPermanent // message vanished; never deliverable
 	}
@@ -153,13 +154,22 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		return err
 	}
 
+	// The sender's organization drives group sender-restriction policies.
+	var senderOrgID string
+	_ = tx.QueryRow(ctx,
+		`SELECT organization_id FROM mailboxes WHERE address = $1`, fromAddress).Scan(&senderOrgID)
+
 	for _, r := range pending {
-		targets, err := w.resolveTargets(ctx, tx, p.TenantID, r.address)
+		targets, policyReason, err := w.resolveTargets(ctx, tx, p.TenantID, r.address, senderOrgID)
 		if err != nil {
 			return err
 		}
 		if len(targets) == 0 {
-			if err := w.finishRecipient(ctx, tx, p.MessageID, r.id, "", "failed", "no such mailbox"); err != nil {
+			reason := "no such mailbox"
+			if policyReason != "" {
+				reason = policyReason
+			}
+			if err := w.finishRecipient(ctx, tx, p.MessageID, r.id, "", "failed", reason); err != nil {
 				return err
 			}
 			continue
@@ -210,22 +220,26 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	return tx.Commit(ctx)
 }
 
-// resolveTargets maps an address to local mailbox ids: a direct mailbox or
-// the targets of an active alias. Unknown addresses return no targets (in
-// Phase 1 there is no internet routing branch yet).
-func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, address string) ([]string, error) {
+// resolveTargets maps an address to local mailbox ids: a direct mailbox,
+// the targets of an active alias, or the members of an active group. Aliases
+// and groups target mailboxes only (no nesting), so resolution depth is 1 and
+// loops are structurally impossible. Unknown addresses return no targets (in
+// Phase 1 there is no internet routing branch yet). policyReason is set when
+// an address exists but a policy (e.g. internal-only group) blocks delivery.
+func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, address, senderOrgID string) (targets []string, policyReason string, err error) {
 	var mailboxID string
-	err := tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT m.id FROM mailboxes m
 		JOIN domains d ON d.id = m.domain_id
 		WHERE m.address = $1 AND m.status = 'active' AND d.status = 'verified'`,
 		address).Scan(&mailboxID)
 	if err == nil {
-		return []string{mailboxID}, nil
+		return []string{mailboxID}, "", nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+		return nil, "", err
 	}
+
 	rows, err := tx.Query(ctx, `
 		SELECT t.mailbox_id
 		FROM mailbox_aliases a
@@ -233,18 +247,60 @@ func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, addres
 		JOIN mailboxes m ON m.id = t.mailbox_id AND m.status = 'active'
 		WHERE a.address = $1 AND a.status = 'active'`, address)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	defer rows.Close()
-	var targets []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return nil, err
+			rows.Close()
+			return nil, "", err
 		}
 		targets = append(targets, id)
 	}
-	return targets, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+	if len(targets) > 0 {
+		return targets, "", nil
+	}
+
+	// Group resolution with sender restriction.
+	var groupID, groupOrgID string
+	var internalOnly bool
+	err = tx.QueryRow(ctx, `
+		SELECT id, organization_id, internal_only FROM mail_groups
+		WHERE address = $1 AND status = 'active'`, address).
+		Scan(&groupID, &groupOrgID, &internalOnly)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if internalOnly && groupOrgID != senderOrgID {
+		return nil, "group accepts internal senders only", nil
+	}
+	gRows, err := tx.Query(ctx, `
+		SELECT gm.mailbox_id
+		FROM mail_group_members gm
+		JOIN mailboxes m ON m.id = gm.mailbox_id AND m.status = 'active'
+		WHERE gm.group_id = $1`, groupID)
+	if err != nil {
+		return nil, "", err
+	}
+	defer gRows.Close()
+	for gRows.Next() {
+		var id string
+		if err := gRows.Scan(&id); err != nil {
+			return nil, "", err
+		}
+		targets = append(targets, id)
+	}
+	if len(targets) == 0 {
+		return nil, "group has no active members", nil
+	}
+	return targets, "", gRows.Err()
 }
 
 // deliverToMailbox inserts the inbox copy and accounts quota. Returns

@@ -34,10 +34,9 @@ func Provision(ctx context.Context, tx pgx.Tx, tenantID, orgID, domainID, domain
 	}
 	address := mailaddr.Join(local, domainName)
 
-	// The address namespace is shared between mailboxes and aliases.
-	var taken bool
-	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM mailbox_aliases WHERE address = $1)`, address).Scan(&taken); err != nil {
+	// The address namespace is shared between mailboxes, aliases and groups.
+	taken, err := AddressInUse(ctx, tx, address)
+	if err != nil {
 		return "", err
 	}
 	if taken {
