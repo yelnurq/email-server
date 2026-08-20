@@ -49,6 +49,22 @@ npm install
 npm run dev
 ```
 
+On first start with an empty database the API bootstraps the initial admin
+from `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` (see `.env`).
+Sign in at http://localhost:3000, then: Admin → add a development domain
+(e.g. `company.test`) → create users with mailboxes → users exchange mail.
+
+## End-to-end tests
+
+With infra + API + worker running:
+
+```bash
+bash scripts/e2e.sh
+```
+
+19 checks: full send/receive/reply journey, Sent copies, mailbox and
+cross-tenant isolation, RBAC, session revocation.
+
 All commands are identical in PowerShell, Git Bash and Linux shells.
 `make up`, `make api`, `make web` etc. are available where `make` exists
 (see [Makefile](Makefile)).
@@ -89,12 +105,28 @@ docs/              architecture + ADRs
 docker-compose.yml local infrastructure (Linux containers)
 ```
 
+## API (v1)
+
+All endpoints under `/api/v1`, unified error envelope
+`{"error":{"code","message","request_id"}}`.
+
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /me` |
+| Admin | `GET/POST /organizations`, `GET/POST /domains`, `GET/POST /users`, `GET/POST /mailboxes` |
+| Webmail | `GET /mail/summary`, `GET /mail/messages?folder=&q=&limit=&offset=`, `GET/PATCH/DELETE /mail/messages/{id}`, `POST /mail/send` |
+| Drafts | `POST /mail/drafts`, `PUT /mail/drafts/{id}`, `POST /mail/drafts/{id}/send` |
+
+Sessions: HttpOnly cookie for the browser, or `Authorization: Bearer <token>`
+from the login response.
+
 ## Quality checks
 
 ```bash
 gofmt -l .            # formatting (empty output = clean)
 go vet ./...
-go test ./...
+go test ./...         # on Windows set GOTMPDIR=./bin/gotmp first
+                      # (Application Control blocks test exes in %TEMP%)
 go build ./...
 
 cd apps/web
