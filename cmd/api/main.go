@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/yelnurq/email-server/internal/aliases"
+	"github.com/yelnurq/email-server/internal/attachments"
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
@@ -30,6 +31,7 @@ import (
 	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/organization"
 	"github.com/yelnurq/email-server/internal/server"
+	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/tenant"
 	"github.com/yelnurq/email-server/internal/users"
 )
@@ -111,8 +113,20 @@ func run() error {
 	publisher := &events.Publisher{Pool: pool, NATS: nc, Log: log}
 	go publisher.Run(ctx)
 
+	store, err := storage.NewS3Store(ctx, storage.Config{
+		Endpoint:  cfg.S3Endpoint,
+		AccessKey: cfg.S3AccessKey,
+		SecretKey: cfg.S3SecretKey,
+		Region:    cfg.S3Region,
+		Bucket:    cfg.S3BucketAttachments,
+	})
+	if err != nil {
+		return err
+	}
+
 	messageService := &messages.Service{Pool: pool}
 	webmail := &messages.WebmailHandlers{Svc: messageService, Log: log}
+	attachmentHandlers := &attachments.Handlers{Pool: pool, Store: store, Log: log}
 
 	orgHandlers := &organization.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
@@ -183,6 +197,10 @@ func run() error {
 					Put("/mail/drafts/{id}", webmail.UpdateDraft)
 				mail.With(auth.RequirePermission("mail.send")).
 					Post("/mail/drafts/{id}/send", webmail.SendDraft)
+
+				mail.With(auth.RequirePermission("mail.send")).
+					Post("/mail/attachments", attachmentHandlers.Upload)
+				mail.Get("/mail/attachments/{id}", attachmentHandlers.Download)
 			})
 		},
 	}

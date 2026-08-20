@@ -165,18 +165,18 @@ func (h *WebmailHandlers) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	mmID := chi.URLParam(r, "id")
 
-	var msgID, publicID, threadID, from, fromDisplay, subject, bodyText, date, folderType string
+	var msgID, publicID, threadID, from, fromDisplay, subject, bodyText, bodyHTML, date, folderType string
 	var isRead, isStarred, hasAttachments bool
 	err := h.Svc.Pool.QueryRow(r.Context(), `
 		SELECT m.id, m.public_id, COALESCE(m.thread_id::text, ''), m.from_address::text,
-		       m.from_display, m.subject, m.body_text, mm.created_at::text,
+		       m.from_display, m.subject, m.body_text, m.body_html, mm.created_at::text,
 		       f.type, mm.is_read, mm.is_starred, m.has_attachments
 		FROM mailbox_messages mm
 		JOIN messages m ON m.id = mm.message_id
 		JOIN folders f ON f.id = mm.folder_id
 		WHERE mm.id = $1 AND mm.mailbox_id = $2`, mmID, mb.ID).
 		Scan(&msgID, &publicID, &threadID, &from, &fromDisplay, &subject, &bodyText,
-			&date, &folderType, &isRead, &isStarred, &hasAttachments)
+			&bodyHTML, &date, &folderType, &isRead, &isStarred, &hasAttachments)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusNotFound, "MESSAGE_NOT_FOUND", "Message not found")
 		return
@@ -234,6 +234,29 @@ func (h *WebmailHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Attachment metadata for the reader.
+	type attachmentView struct {
+		ID          string `json:"id"`
+		Filename    string `json:"filename"`
+		ContentType string `json:"content_type"`
+		SizeBytes   int64  `json:"size_bytes"`
+	}
+	atts := []attachmentView{}
+	if hasAttachments {
+		aRows, err := h.Svc.Pool.Query(r.Context(), `
+			SELECT public_id, filename, content_type, size_bytes
+			FROM attachments WHERE message_id = $1 ORDER BY created_at`, msgID)
+		if err == nil {
+			defer aRows.Close()
+			for aRows.Next() {
+				var av attachmentView
+				if err := aRows.Scan(&av.ID, &av.Filename, &av.ContentType, &av.SizeBytes); err == nil {
+					atts = append(atts, av)
+				}
+			}
+		}
+	}
+
 	// Opening a message marks it read.
 	if !isRead {
 		_, _ = h.Svc.Pool.Exec(r.Context(),
@@ -250,10 +273,12 @@ func (h *WebmailHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		"recipients":      recipients,
 		"subject":         subject,
 		"body_text":       bodyText,
+		"body_html":       bodyHTML,
 		"date":            date,
 		"is_read":         isRead,
 		"is_starred":      isStarred,
 		"has_attachments": hasAttachments,
+		"attachments":     atts,
 		"thread":          thread,
 	})
 }
@@ -360,12 +385,13 @@ func (h *WebmailHandlers) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 type sendRequest struct {
-	To        []string `json:"to"`
-	Cc        []string `json:"cc"`
-	Bcc       []string `json:"bcc"`
-	Subject   string   `json:"subject"`
-	Text      string   `json:"text"`
-	InReplyTo string   `json:"in_reply_to"`
+	To            []string `json:"to"`
+	Cc            []string `json:"cc"`
+	Bcc           []string `json:"bcc"`
+	Subject       string   `json:"subject"`
+	Text          string   `json:"text"`
+	InReplyTo     string   `json:"in_reply_to"`
+	AttachmentIDs []string `json:"attachment_ids"`
 }
 
 // Send accepts a message for delivery and returns 202 with its public id.
@@ -382,6 +408,7 @@ func (h *WebmailHandlers) Send(w http.ResponseWriter, r *http.Request) {
 	publicID, err := h.Svc.Accept(r.Context(), id.TenantID, mb, id.DisplayName, SendInput{
 		To: req.To, Cc: req.Cc, Bcc: req.Bcc,
 		Subject: req.Subject, Text: req.Text, InReplyTo: req.InReplyTo,
+		AttachmentIDs: req.AttachmentIDs, SenderUserID: id.UserID,
 	})
 	var vErr *ValidationError
 	if errors.As(err, &vErr) {

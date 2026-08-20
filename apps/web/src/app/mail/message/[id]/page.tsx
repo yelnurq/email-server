@@ -1,10 +1,11 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, formatDate, type MessageDetail } from "@/lib/api";
+import DOMPurify from "dompurify";
+import { API_URL, api, formatBytes, formatDate, type MessageDetail } from "@/lib/api";
 import {
   Button,
   ConfirmDialog,
@@ -29,6 +30,18 @@ export default function MessagePage({ params }: { params: Promise<{ id: string }
     queryKey: ["mail", "message", id],
     queryFn: () => api.get<MessageDetail>(`/api/v1/mail/messages/${id}`),
   });
+
+  // HTML bodies are sanitized before rendering; scripts, event handlers and
+  // dangerous URLs are stripped. Plain-text messages never touch innerHTML.
+  const sanitizedHTML = useMemo(() => {
+    const html = msg.data?.body_html;
+    if (!html) return "";
+    return DOMPurify.sanitize(html, {
+      FORBID_TAGS: ["style", "form", "input", "button", "iframe", "object", "embed"],
+      FORBID_ATTR: ["srcset"],
+      ALLOW_UNKNOWN_PROTOCOLS: false,
+    });
+  }, [msg.data?.body_html]);
 
   if (msg.isLoading) return <PageLoader />;
   if (msg.isError || !msg.data)
@@ -143,7 +156,37 @@ export default function MessagePage({ params }: { params: Promise<{ id: string }
             {bcc.length > 0 && <p>Bcc: {bcc.join(", ")}</p>}
           </div>
         </header>
-        <div className="whitespace-pre-wrap p-5 text-sm leading-relaxed">{m.body_text}</div>
+        {m.body_text ? (
+          <div className="whitespace-pre-wrap p-5 text-sm leading-relaxed">{m.body_text}</div>
+        ) : sanitizedHTML ? (
+          <div
+            className="prose prose-sm max-w-none p-5 dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
+          />
+        ) : (
+          <div className="p-5 text-sm text-neutral-400">(empty message)</div>
+        )}
+        {m.attachments.length > 0 && (
+          <footer className="border-t border-neutral-100 p-5 dark:border-neutral-800">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+              Attachments ({m.attachments.length})
+            </h2>
+            <ul className="flex flex-wrap gap-2">
+              {m.attachments.map((a) => (
+                <li key={a.id}>
+                  <a
+                    href={`${API_URL}/api/v1/mail/attachments/${a.id}`}
+                    className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm hover:border-indigo-300 hover:bg-indigo-50 dark:border-neutral-700 dark:hover:bg-indigo-950"
+                  >
+                    <span aria-hidden>📎</span>
+                    <span className="max-w-56 truncate">{a.filename}</span>
+                    <span className="text-xs text-neutral-400">{formatBytes(a.size_bytes)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </footer>
+        )}
       </article>
 
       {m.thread.length > 1 && (

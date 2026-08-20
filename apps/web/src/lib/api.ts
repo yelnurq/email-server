@@ -98,6 +98,13 @@ export type Recipient = { kind: "to" | "cc" | "bcc"; address: string };
 
 export type ThreadItem = { id: string; subject: string; from: string; date: string };
 
+export type Attachment = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+};
+
 export type MessageDetail = {
   id: string;
   message_id: string;
@@ -107,12 +114,49 @@ export type MessageDetail = {
   recipients: Recipient[];
   subject: string;
   body_text: string;
+  body_html: string;
   date: string;
   is_read: boolean;
   is_starred: boolean;
   has_attachments: boolean;
+  attachments: Attachment[];
   thread: ThreadItem[];
 };
+
+// uploadAttachment posts a file with progress callbacks (XHR: fetch has no
+// upload progress). Resolves with the staged attachment metadata.
+export function uploadAttachment(
+  file: File,
+  onProgress: (fraction: number) => void,
+): Promise<Attachment> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/api/v1/mail/attachments`);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      try {
+        const body = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body as Attachment);
+        else reject(new ApiError(xhr.status, body?.error?.code ?? "UNKNOWN", body?.error?.message ?? "Upload failed"));
+      } catch {
+        reject(new ApiError(xhr.status, "UNKNOWN", "Upload failed"));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, "NETWORK", "Upload failed"));
+    const form = new FormData();
+    form.append("file", file);
+    xhr.send(form);
+  });
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
 
 export type Organization = { id: string; name: string; slug: string; status: string; created_at: string };
 export type Domain = {

@@ -19,10 +19,11 @@ type Config struct {
 	RedisURL    string
 	NATSURL     string
 
-	S3Endpoint  string
-	S3AccessKey string
-	S3SecretKey string
-	S3Region    string
+	S3Endpoint          string
+	S3AccessKey         string
+	S3SecretKey         string
+	S3Region            string
+	S3BucketAttachments string
 
 	CORSAllowedOrigins []string
 
@@ -43,16 +44,17 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		APIAddr:     getEnv("API_ADDR", ":8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		RedisURL:    os.Getenv("REDIS_URL"),
-		NATSURL:     os.Getenv("NATS_URL"),
-		S3Endpoint:  os.Getenv("S3_ENDPOINT"),
-		S3AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		S3SecretKey: os.Getenv("S3_SECRET_KEY"),
-		S3Region:    getEnv("S3_REGION", "us-east-1"),
-		LogLevel:    getEnv("LOG_LEVEL", "info"),
-		LogFormat:   getEnv("LOG_FORMAT", "json"),
+		APIAddr:             getEnv("API_ADDR", ":8080"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		RedisURL:            os.Getenv("REDIS_URL"),
+		NATSURL:             os.Getenv("NATS_URL"),
+		S3Endpoint:          os.Getenv("S3_ENDPOINT"),
+		S3AccessKey:         os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:         os.Getenv("S3_SECRET_KEY"),
+		S3Region:            getEnv("S3_REGION", "us-east-1"),
+		S3BucketAttachments: getEnv("S3_BUCKET_ATTACHMENTS", "mail-attachments"),
+		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		LogFormat:           getEnv("LOG_FORMAT", "json"),
 
 		CookieSecure: getEnv("COOKIE_SECURE", "false") == "true",
 

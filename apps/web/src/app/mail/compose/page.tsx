@@ -3,8 +3,23 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, type MessageDetail } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  formatBytes,
+  uploadAttachment,
+  type Attachment,
+  type MessageDetail,
+} from "@/lib/api";
 import { Button, Input, PageLoader, Textarea, useToast } from "@/components/ui";
+
+type PendingUpload = {
+  key: string;
+  name: string;
+  progress: number;
+  attachment?: Attachment;
+  error?: string;
+};
 
 function parseAddresses(s: string): string[] {
   return s
@@ -29,6 +44,7 @@ function ComposeForm() {
   const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploads, setUploads] = useState<PendingUpload[]>([]);
   const [loaded, setLoaded] = useState(!draftParam && !forwardParam);
   const [draftId, setDraftId] = useState<string | null>(draftParam);
   const [savedAt, setSavedAt] = useState<string>("");
@@ -104,15 +120,41 @@ function ComposeForm() {
     dirty.current = true;
   }
 
+  async function addFiles(files: FileList | null) {
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (file.size > 25 * 1024 * 1024) {
+        toast("error", `${file.name}: file exceeds the 25 MB limit`);
+        continue;
+      }
+      const key = `${file.name}-${Date.now()}-${Math.random()}`;
+      setUploads((u) => [...u, { key, name: file.name, progress: 0 }]);
+      try {
+        const att = await uploadAttachment(file, (fraction) =>
+          setUploads((u) => u.map((x) => (x.key === key ? { ...x, progress: fraction } : x))),
+        );
+        setUploads((u) => u.map((x) => (x.key === key ? { ...x, progress: 1, attachment: att } : x)));
+      } catch {
+        setUploads((u) => u.map((x) => (x.key === key ? { ...x, error: "Upload failed" } : x)));
+        toast("error", `${file.name}: upload failed`);
+      }
+    }
+  }
+
   async function send() {
     const toList = parseAddresses(to);
     if (toList.length === 0) {
       toast("error", "Add at least one recipient");
       return;
     }
+    if (uploads.some((u) => !u.attachment && !u.error)) {
+      toast("error", "Wait for attachments to finish uploading");
+      return;
+    }
+    const attachmentIds = uploads.filter((u) => u.attachment).map((u) => u.attachment!.id);
     setSending(true);
     try {
-      if (draftId) {
+      if (draftId && attachmentIds.length === 0) {
         // Persist latest content, then promote the draft.
         const ok = await saveDraft();
         if (!ok) throw new Error("draft save failed");
@@ -124,7 +166,11 @@ function ComposeForm() {
           bcc: parseAddresses(bcc),
           subject,
           text,
+          attachment_ids: attachmentIds,
         });
+        if (draftId) {
+          await api.delete(`/api/v1/mail/messages/${draftId}`).catch(() => {});
+        }
       }
       qc.invalidateQueries({ queryKey: ["mail"] });
       toast("success", "Message sent");
@@ -203,11 +249,60 @@ function ComposeForm() {
               markDirty();
             }}
           />
+          {uploads.length > 0 && (
+            <ul className="space-y-1">
+              {uploads.map((u) => (
+                <li
+                  key={u.key}
+                  className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs dark:border-neutral-700"
+                >
+                  <span aria-hidden>📎</span>
+                  <span className="truncate">{u.name}</span>
+                  {u.error && <span className="text-red-600">{u.error}</span>}
+                  {!u.error && !u.attachment && (
+                    <span className="ml-auto flex items-center gap-2 text-neutral-400">
+                      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+                        <span
+                          className="block h-full bg-indigo-500 transition-all"
+                          style={{ width: `${Math.round(u.progress * 100)}%` }}
+                        />
+                      </span>
+                      {Math.round(u.progress * 100)}%
+                    </span>
+                  )}
+                  {u.attachment && (
+                    <span className="ml-auto text-neutral-400">
+                      {formatBytes(u.attachment.size_bytes)}
+                    </span>
+                  )}
+                  <button
+                    className="text-neutral-400 hover:text-red-600"
+                    onClick={() => setUploads((prev) => prev.filter((x) => x.key !== u.key))}
+                    aria-label={`Remove ${u.name}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className="flex items-center gap-2 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
           <Button onClick={send} disabled={sending}>
             {sending ? "Sending…" : "Send"}
           </Button>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
+            📎 Attach
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
           <Button
             variant="secondary"
             onClick={async () => {

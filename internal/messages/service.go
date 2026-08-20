@@ -70,8 +70,16 @@ type SendInput struct {
 	Bcc     []string
 	Subject string
 	Text    string
+	// HTML is an optional HTML body (Email API); webmail sends text only.
+	HTML string
 	// InReplyTo is the public_id of the message being replied to (optional).
 	InReplyTo string
+	// AttachmentIDs are public ids of staged attachments uploaded by the
+	// sending user.
+	AttachmentIDs []string
+	// SenderUserID authorizes attachment linking; empty for API-key sends
+	// that never stage attachments this way.
+	SenderUserID string
 }
 
 // ValidationError distinguishes user errors from internal failures.
@@ -198,18 +206,51 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 
 	publicID = NewPublicID()
 	rfcID := NewRFCMessageID(sender.Domain)
-	size := int64(len(in.Text))
+	size := int64(len(in.Text) + len(in.HTML))
+	snippetSource := in.Text
+	if snippetSource == "" {
+		snippetSource = in.HTML
+	}
 	err = tx.QueryRow(ctx, `
 		INSERT INTO messages (public_id, tenant_id, thread_id, rfc_message_id, in_reply_to,
 		                      references_ids, from_address, from_display, subject, snippet,
-		                      body_text, size_bytes, status, sent_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'accepted', now())
+		                      body_text, body_html, size_bytes, status, sent_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'accepted', now())
 		RETURNING id`,
 		publicID, tenantID, threadID, rfcID, inReplyToRFC, referencesIDs,
-		sender.Address, senderDisplay, in.Subject, makeSnippet(in.Text),
-		in.Text, size).Scan(&msgID)
+		sender.Address, senderDisplay, in.Subject, makeSnippet(snippetSource),
+		in.Text, in.HTML, size).Scan(&msgID)
 	if err != nil {
 		return "", "", err
+	}
+
+	// Link staged attachments (uploaded by the sender, not yet linked).
+	if len(in.AttachmentIDs) > 0 {
+		if len(in.AttachmentIDs) > 20 {
+			return "", "", &ValidationError{Msg: "too many attachments (max 20)"}
+		}
+		ct, err := tx.Exec(ctx, `
+			UPDATE attachments SET message_id = $1
+			WHERE public_id = ANY($2) AND tenant_id = $3
+			  AND uploader_user_id = $4 AND message_id IS NULL`,
+			msgID, in.AttachmentIDs, tenantID, in.SenderUserID)
+		if err != nil {
+			return "", "", err
+		}
+		if int(ct.RowsAffected()) != len(in.AttachmentIDs) {
+			return "", "", &ValidationError{Msg: "one or more attachments are unknown or already used"}
+		}
+		var attachSize int64
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(sum(size_bytes), 0) FROM attachments WHERE message_id = $1`,
+			msgID).Scan(&attachSize); err != nil {
+			return "", "", err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE messages SET has_attachments = true, size_bytes = size_bytes + $1
+			WHERE id = $2`, attachSize, msgID); err != nil {
+			return "", "", err
+		}
 	}
 
 	insertRecipients := func(kind string, list []string) error {
