@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -32,6 +33,8 @@ type User struct {
 	DisplayName    string `json:"display_name"`
 	Status         string `json:"status"`
 	MailboxAddress string `json:"mailbox_address,omitempty"`
+	DepartmentID   string `json:"department_id,omitempty"`
+	DepartmentName string `json:"department_name,omitempty"`
 	CreatedAt      string `json:"created_at"`
 }
 
@@ -40,9 +43,11 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id := auth.IdentityFrom(r.Context())
 	query := `
 		SELECT u.id, COALESCE(u.organization_id::text, ''), u.email::text, u.display_name,
-		       u.status, COALESCE(m.address::text, ''), u.created_at::text
+		       u.status, COALESCE(m.address::text, ''), COALESCE(d.id::text, ''),
+		       COALESCE(d.name, ''), u.created_at::text
 		FROM users u
 		LEFT JOIN mailboxes m ON m.user_id = u.id
+		LEFT JOIN departments d ON d.id = u.department_id
 		WHERE u.tenant_id = $1`
 	args := []any{id.TenantID}
 	if !id.TenantWide() {
@@ -60,7 +65,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	out := []User{}
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.OrganizationID, &u.Email, &u.DisplayName, &u.Status, &u.MailboxAddress, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.OrganizationID, &u.Email, &u.DisplayName, &u.Status, &u.MailboxAddress, &u.DepartmentID, &u.DepartmentName, &u.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
 		}
@@ -75,6 +80,7 @@ type createRequest struct {
 	DisplayName    string `json:"display_name"`
 	Password       string `json:"password"`
 	Role           string `json:"role"`
+	DepartmentID   string `json:"department_id"`
 	// Optional mailbox provisioning on a verified domain.
 	MailboxDomainID  string `json:"mailbox_domain_id"`
 	MailboxLocalPart string `json:"mailbox_local_part"`
@@ -145,14 +151,23 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusNotFound, "ORGANIZATION_NOT_FOUND", "Organization not found")
 		return
 	}
+	if req.DepartmentID != "" {
+		var departmentOK bool
+		if err := tx.QueryRow(r.Context(), `
+			SELECT EXISTS(SELECT 1 FROM departments WHERE id = $1 AND tenant_id = $2 AND organization_id = $3)`,
+			req.DepartmentID, id.TenantID, orgID).Scan(&departmentOK); err != nil || !departmentOK {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_DEPARTMENT", "Department must belong to the same organization")
+			return
+		}
+	}
 
 	var userID string
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO users (tenant_id, organization_id, email, display_name)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO users (tenant_id, organization_id, email, display_name, department_id)
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)
 		ON CONFLICT (email) DO NOTHING
 		RETURNING id`,
-		id.TenantID, orgID, email, strings.TrimSpace(req.DisplayName)).Scan(&userID)
+		id.TenantID, orgID, email, strings.TrimSpace(req.DisplayName), req.DepartmentID).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.Error(w, r, http.StatusConflict, "EMAIL_TAKEN", "A user with this email already exists")
 		return
@@ -214,11 +229,112 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	h.Audit.Record(r.Context(), audit.Entry{
 		TenantID: id.TenantID, ActorUserID: id.UserID, Action: "user.create",
 		ResourceType: "user", ResourceID: userID,
-		Detail: map[string]any{"email": email, "role": role, "mailbox": mailboxAddress},
+		Detail: map[string]any{"email": email, "role": role, "mailbox": mailboxAddress, "department_id": req.DepartmentID},
 	})
 	httpx.JSON(w, http.StatusCreated, map[string]string{
 		"id":              userID,
 		"email":           email,
 		"mailbox_address": mailboxAddress,
 	})
+}
+
+type patchRequest struct {
+	DisplayName  *string `json:"display_name"`
+	Status       *string `json:"status"`
+	DepartmentID *string `json:"department_id"` // empty string clears the department
+}
+
+// Patch updates a user's display name, status (active/disabled) or department.
+// Old and new values are recorded in the audit log so the admin audit trail
+// can answer "who changed what, from what, to what".
+func (h *Handlers) Patch(w http.ResponseWriter, r *http.Request) {
+	id := auth.IdentityFrom(r.Context())
+	userID := chi.URLParam(r, "id")
+	var req patchRequest
+	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	if req.Status != nil && *req.Status != "active" && *req.Status != "disabled" {
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_STATUS", "Status must be active or disabled")
+		return
+	}
+	if req.Status != nil && userID != "" && id.UserID == userID && *req.Status == "disabled" {
+		httpx.Error(w, r, http.StatusBadRequest, "CANNOT_DISABLE_SELF", "You cannot disable your own account")
+		return
+	}
+
+	// Load current state (scoped to the tenant, and to the org for org admins).
+	var current struct {
+		OrgID, Email, DisplayName, Status, DepartmentID string
+	}
+	query := `
+		SELECT COALESCE(u.organization_id::text, ''), u.email::text, u.display_name, u.status,
+		       COALESCE(u.department_id::text, '')
+		FROM users u WHERE u.id = $1 AND u.tenant_id = $2`
+	args := []any{userID, id.TenantID}
+	if !id.TenantWide() {
+		query += ` AND u.organization_id = $3`
+		args = append(args, id.OrganizationID)
+	}
+	err := h.Pool.QueryRow(r.Context(), query, args...).
+		Scan(&current.OrgID, &current.Email, &current.DisplayName, &current.Status, &current.DepartmentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, r, http.StatusNotFound, "USER_NOT_FOUND", "User not found")
+		return
+	}
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	if req.DepartmentID != nil && *req.DepartmentID != "" {
+		var departmentOK bool
+		if err := h.Pool.QueryRow(r.Context(), `
+			SELECT EXISTS(SELECT 1 FROM departments WHERE id = $1 AND tenant_id = $2 AND organization_id = $3)`,
+			*req.DepartmentID, id.TenantID, current.OrgID).Scan(&departmentOK); err != nil || !departmentOK {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_DEPARTMENT", "Department must belong to the user's organization")
+			return
+		}
+	}
+
+	changes := map[string]any{}
+	if req.DisplayName != nil && strings.TrimSpace(*req.DisplayName) != current.DisplayName {
+		name := strings.TrimSpace(*req.DisplayName)
+		if _, err := h.Pool.Exec(r.Context(), `UPDATE users SET display_name = $1 WHERE id = $2`, name, userID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		changes["display_name"] = map[string]string{"old": current.DisplayName, "new": name}
+	}
+	if req.Status != nil && *req.Status != current.Status {
+		if _, err := h.Pool.Exec(r.Context(), `UPDATE users SET status = $1 WHERE id = $2`, *req.Status, userID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		if *req.Status == "disabled" {
+			// Disabling revokes every active session immediately.
+			if _, err := h.Pool.Exec(r.Context(), `DELETE FROM sessions WHERE user_id = $1`, userID); err != nil {
+				h.Log.Warn("could not revoke sessions for disabled user", slog.String("user_id", userID), slog.String("error", err.Error()))
+			}
+		}
+		changes["status"] = map[string]string{"old": current.Status, "new": *req.Status}
+	}
+	if req.DepartmentID != nil && *req.DepartmentID != current.DepartmentID {
+		if _, err := h.Pool.Exec(r.Context(),
+			`UPDATE users SET department_id = NULLIF($1, '')::uuid WHERE id = $2`, *req.DepartmentID, userID); err != nil {
+			httpx.Internal(w, r)
+			return
+		}
+		changes["department_id"] = map[string]string{"old": current.DepartmentID, "new": *req.DepartmentID}
+	}
+
+	if len(changes) > 0 {
+		h.Audit.Record(r.Context(), audit.Entry{
+			TenantID: id.TenantID, ActorUserID: id.UserID, Action: "user.update",
+			ResourceType: "user", ResourceID: userID,
+			Detail: map[string]any{"email": current.Email, "changes": changes},
+		})
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

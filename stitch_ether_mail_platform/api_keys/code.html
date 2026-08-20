@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EmailSaaS - API Keys</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#ecf1ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed": "#191c1e",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#e0e3e5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#2563eb",
+                        "on-background": "#111c2d",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "secondary": "#5c5f61",
+                        "tertiary": "#943700",
+                        "surface-container-high": "#dee8ff",
+                        "surface-bright": "#f9f9ff",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "outline-variant": "#c3c6d7",
+                        "surface-dim": "#cfdaf2",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#004ac6",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#263143",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-container": "#bc4800",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f3ff",
+                        "on-secondary-fixed-variant": "#444749",
+                        "outline": "#737686",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#111c2d",
+                        "surface-container": "#e7eeff",
+                        "on-primary-container": "#eeefff",
+                        "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "container-padding-desktop": "24px",
+                        "container-padding-mobile": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "code-sm": ["jetbrainsMono"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                },
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen w-[260px] fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant p-stack-md overflow-y-auto z-40">
+<div class="mb-stack-lg flex items-center gap-gutter px-unit">
+<div class="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container flex-shrink-0">
+<span class="material-symbols-outlined text-[20px] filled">mail</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">EmailSaaS</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</p>
+</div>
+</div>
+<div class="flex-1 space-y-unit">
+<div class="mb-stack-sm">
+<p class="font-label-md text-label-md text-outline px-gutter mb-unit uppercase tracking-wider">Mailbox</p>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">inbox</span>
+<span class="font-label-md text-label-md">Inbox</span>
+</a>
+</div>
+<div class="mb-stack-sm">
+<p class="font-label-md text-label-md text-outline px-gutter mb-unit mt-stack-sm uppercase tracking-wider">Infrastructure</p>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">domain</span>
+<span class="font-label-md text-label-md">Domains</span>
+</a>
+<!-- ACTIVE NAV ITEM -->
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg bg-secondary-container text-on-secondary-container font-medium opacity-90 transition-opacity" href="#">
+<span class="material-symbols-outlined text-[20px] filled">vpn_key</span>
+<span class="font-label-md text-label-md">API Keys</span>
+</a>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings_ethernet</span>
+<span class="font-label-md text-label-md">SMTP</span>
+</a>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">webhook</span>
+<span class="font-label-md text-label-md">Webhooks</span>
+</a>
+</div>
+<div class="mb-stack-sm">
+<p class="font-label-md text-label-md text-outline px-gutter mb-unit mt-stack-sm uppercase tracking-wider">Account</p>
+<a class="flex items-center gap-gutter px-gutter py-[10px] rounded-lg text-on-surface-variant hover:bg-secondary-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</div>
+<div class="mt-auto pt-stack-md border-t border-outline-variant">
+<div class="flex items-center gap-gutter px-gutter">
+<img alt="Organization Logo" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A small, professional portrait headshot of a corporate user in a well-lit office setting. The image is cropped in a perfect circle, displaying sharp focus and professional lighting suitable for an enterprise software avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8VmqEfngz-R-GmRl5QeYAGkMol0_eBga_IdufnTZtgC8cEIzptyPbxEKMp9u5pAgLDxz9KaZ1LDpmVJGRoP4_729f7BnXoCpVPst0xP42qOy07IGJuDMCL57dDqIT-UhvdrQ7VKVsg41r83ZgD1E0UWC0iakaFMXpywXvROi7_poefcrZz15yW0w5SnWHfD72yCTCPLiRsxdwJ-kfWh3gkXGas3rwe0mWR3Mh0MJBl5wvzB4MgKs"/>
+<div class="overflow-hidden">
+<p class="font-label-md text-label-md text-on-surface truncate font-medium">Dev Team Alpha</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate text-[11px]">admin@emailsaas.com</p>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<div class="flex-1 flex flex-col md:ml-[260px] min-h-screen">
+<!-- TopNavBar -->
+<header class="flex items-center justify-between w-full px-container-padding-desktop h-14 bg-surface border-b border-outline-variant sticky top-0 z-30">
+<div class="flex items-center gap-stack-md flex-1">
+<!-- Search Bar -->
+<div class="relative w-64 max-w-full hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">search</span>
+<input class="w-full h-8 pl-9 pr-3 rounded bg-surface-container-low border border-transparent focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 font-body-sm text-body-sm text-on-surface placeholder-outline transition-all outline-none" placeholder="Search resources..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-stack-md">
+<nav class="hidden lg:flex items-center gap-stack-md mr-stack-md">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Docs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Changelog</a>
+</nav>
+<div class="flex items-center gap-unit border-l border-outline-variant pl-stack-md">
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-[20px]">help</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors lg:hidden">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-container-padding-mobile md:p-container-padding-desktop max-w-[1200px] w-full mx-auto">
+<!-- Header Section -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-stack-md mb-stack-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-unit">API Keys</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage authentication tokens for API access. Ensure you keep your keys secure.</p>
+</div>
+<button class="inline-flex items-center justify-center gap-2 h-10 px-4 bg-primary-container text-on-primary-container rounded-lg font-label-md text-label-md hover:bg-primary-fixed-variant hover:text-on-primary transition-colors whitespace-nowrap self-start sm:self-auto shadow-sm" onclick="document.getElementById('new-key-modal').classList.remove('hidden')">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Create API Key
+                </button>
+</div>
+<!-- New Key Creation State (Hidden by default, shown when a key is created) -->
+<div class="hidden mb-stack-lg bg-surface-container-lowest border border-success/30 rounded-xl p-stack-md shadow-[0_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden" id="new-key-alert">
+<div class="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+<div class="flex items-start gap-stack-md">
+<div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 mt-1">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-unit">New API Key Created Successfully</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md">Please copy this key and store it somewhere safe. <strong class="text-on-surface">For security reasons, you will not be able to see it again.</strong></p>
+<div class="flex items-center gap-2 bg-surface-container-low border border-outline-variant rounded-lg p-2 max-w-2xl">
+<code class="font-code-sm text-code-sm text-on-surface flex-1 px-2 truncate selection:bg-primary-fixed">eml_live_9f8e7d6c5b4a39281726354455667788</code>
+<button class="inline-flex items-center justify-center h-8 px-3 bg-surface-container-lowest border border-outline-variant rounded text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors shadow-sm gap-2" onclick="alert('Copied to clipboard!')">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+                                Copy
+                            </button>
+</div>
+</div>
+<button class="text-outline hover:text-on-surface" onclick="document.getElementById('new-key-alert').classList.add('hidden')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<!-- Data Table Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+<!-- Table Controls -->
+<div class="p-stack-md border-b border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-stack-md bg-surface-bright/50">
+<div class="flex items-center gap-2 w-full sm:w-auto">
+<div class="relative w-full sm:w-72">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">search</span>
+<input class="w-full h-9 pl-9 pr-3 rounded-lg bg-surface border border-outline-variant focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 font-body-sm text-body-sm text-on-surface placeholder-outline transition-all outline-none" placeholder="Filter keys..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2 self-end sm:self-auto">
+<button class="inline-flex items-center justify-center h-9 px-3 bg-surface border border-outline-variant rounded-lg text-on-surface-variant font-label-md text-label-md hover:bg-surface-container transition-colors gap-2">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+                            Filter
+                        </button>
+</div>
+</div>
+<!-- Table Container -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-bright/50">
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Key Name</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Project</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Permissions</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Created Date</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Last Used</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-stack-md font-medium">Status</th>
+<th class="py-3 px-stack-md w-10"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/50">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface-variant border border-outline-variant/50">
+<span class="material-symbols-outlined text-[18px]">key</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Production Billing Sync</p>
+<p class="font-code-sm text-code-sm text-outline mt-0.5">eml_live_...4455</p>
+</div>
+</div>
+</td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-low border border-outline-variant/30 font-label-md text-[11px] text-on-surface-variant">Default Project</span>
+</td>
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[16px] text-secondary">admin_panel_settings</span>
+<span class="font-body-sm text-body-sm">Admin</span>
+</div>
+</td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    Oct 12, 2023
+                                </td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    2 mins ago
+                                </td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-label-md text-[11px] border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="py-3 px-stack-md">
+<button class="w-8 h-8 flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface-variant border border-outline-variant/50">
+<span class="material-symbols-outlined text-[18px]">key</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Staging Environment Read</p>
+<p class="font-code-sm text-code-sm text-outline mt-0.5">eml_test_...8910</p>
+</div>
+</div>
+</td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-low border border-outline-variant/30 font-label-md text-[11px] text-on-surface-variant">Staging Apps</span>
+</td>
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[16px] text-secondary">visibility</span>
+<span class="font-body-sm text-body-sm">Read-only</span>
+</div>
+</td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    Sep 05, 2023
+                                </td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    Yesterday
+                                </td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-label-md text-[11px] border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="py-3 px-stack-md">
+<button class="w-8 h-8 flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 (Revoked) -->
+<tr class="hover:bg-surface-container-low/50 transition-colors group opacity-60">
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface-variant border border-outline-variant/50">
+<span class="material-symbols-outlined text-[18px]">key_off</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold line-through decoration-outline">Old Marketing Integration</p>
+<p class="font-code-sm text-code-sm text-outline mt-0.5">eml_live_...2211</p>
+</div>
+</div>
+</td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center px-2 py-1 rounded bg-surface-container-low border border-outline-variant/30 font-label-md text-[11px] text-on-surface-variant">Marketing</span>
+</td>
+<td class="py-3 px-stack-md">
+<div class="flex items-center gap-1.5 text-on-surface">
+<span class="material-symbols-outlined text-[16px] text-secondary">visibility</span>
+<span class="font-body-sm text-body-sm">Read-only</span>
+</div>
+</td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    Jan 15, 2023
+                                </td>
+<td class="py-3 px-stack-md font-body-sm text-body-sm text-on-surface-variant">
+                                    Aug 22, 2023
+                                </td>
+<td class="py-3 px-stack-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-md text-[11px] border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                                        Revoked
+                                    </span>
+</td>
+<td class="py-3 px-stack-md">
+<button class="w-8 h-8 flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-stack-md border-t border-outline-variant flex items-center justify-between bg-surface-bright/50">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Showing 1 to 3 of 12 keys</p>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-outline bg-surface-container-lowest opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface bg-surface-container-lowest hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Create API Key Modal (Hidden by default) -->
+<div class="fixed inset-0 z-50 bg-on-background/20 backdrop-blur-sm hidden flex items-center justify-center p-container-padding-mobile" id="new-key-modal">
+<div class="bg-surface-container-lowest w-full max-w-md rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.1)] border border-outline-variant overflow-hidden flex flex-col">
+<div class="px-stack-md py-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Create API Key</h3>
+<button class="text-outline hover:text-on-surface transition-colors" onclick="document.getElementById('new-key-modal').classList.add('hidden')">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-stack-md flex-1 overflow-y-auto space-y-stack-md">
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-unit">Key Name</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface border border-outline-variant focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 font-body-md text-body-md text-on-surface placeholder-outline transition-all outline-none" placeholder="e.g. Production Billing Sync" type="text"/>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1.5">A descriptive name to identify this key.</p>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-unit">Project</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface border border-outline-variant focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 font-body-md text-body-md text-on-surface outline-none appearance-none">
+<option>Default Project</option>
+<option>Staging Apps</option>
+<option>Marketing</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-stack-sm">Permissions</label>
+<div class="space-y-2">
+<label class="flex items-start gap-3 p-3 rounded-lg border border-primary-container bg-primary-fixed/20 cursor-pointer">
+<input checked="" class="mt-0.5 text-primary-container focus:ring-primary-container" name="perms" type="radio"/>
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-0.5">Admin</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Full read and write access to all resources in the selected project.</span>
+</div>
+</label>
+<label class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant bg-surface hover:bg-surface-container/50 cursor-pointer transition-colors">
+<input class="mt-0.5 text-primary-container focus:ring-primary-container" name="perms" type="radio"/>
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-0.5">Read-only</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Can only view resources, cannot create, modify, or delete.</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+<div class="p-stack-md border-t border-outline-variant bg-surface-bright flex justify-end gap-3">
+<button class="h-10 px-4 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors" onclick="document.getElementById('new-key-modal').classList.add('hidden')">
+                    Cancel
+                </button>
+<button class="h-10 px-4 rounded-lg bg-primary-container text-on-primary-container font-label-md text-label-md hover:bg-primary-fixed-variant hover:text-on-primary transition-colors shadow-sm" onclick="document.getElementById('new-key-modal').classList.add('hidden'); document.getElementById('new-key-alert').classList.remove('hidden');">
+                    Generate Key
+                </button>
+</div>
+</div>
+</div>
+</body></html>

@@ -1,110 +1,295 @@
 "use client";
 
+// Admin overview: real operational data only — no decorative charts.
+// Counts, live audit activity, subsystem health and security signals.
+
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { api, type AdminUser, type Domain, type Mailbox, type Organization } from "@/lib/api";
-import { PageLoader, cx } from "@/components/ui";
+import { API_URL, api, type AdminUser, type Department, type Domain, type Mailbox } from "@/lib/api";
+import { useMe } from "@/components/providers";
+import { Badge, Button, Skeleton, cx } from "@/components/ui";
+import { Icon } from "@/components/icons";
+
+type AuditEntry = {
+  id: number;
+  actor_email?: string;
+  action: string;
+  resource_type?: string;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+};
+
+const ACTION_TEXT: Record<string, string> = {
+  "auth.login": "signed in",
+  "auth.login_failed": "failed to sign in",
+  "auth.logout": "signed out",
+  "auth.password_change": "changed password",
+  "user.create": "created user",
+  "user.update": "updated user",
+  "department.create": "created department",
+  "department.members_update": "changed department members",
+  "bulk_email.send": "started a broadcast",
+  "security.block_sender": "blocked a sender",
+  "quarantine.release": "released from quarantine",
+};
+
+function timeAgo(iso: string): string {
+  const d = new Date(iso.replace(" ", "T").replace("+00", "Z"));
+  const mins = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function StatCell({ label, value, href, sub }: { label: string; value: React.ReactNode; href: string; sub?: string }) {
+  return (
+    <Link href={href} className="group flex-1 border-l border-border px-4 py-3 first:border-l-0 hover:bg-background">
+      <p className="text-[11.5px] font-medium text-muted-foreground">{label}</p>
+      <div className="mt-1 text-xl font-semibold tracking-[-.01em] tabular-nums group-hover:text-primary">{value}</div>
+      {sub && <p className="mt-0.5 text-[11px] text-faint">{sub}</p>}
+    </Link>
+  );
+}
 
 export default function AdminDashboard() {
-  const orgs = useQuery({
-    queryKey: ["admin", "organizations"],
-    queryFn: () => api.get<{ organizations: Organization[] }>("/api/v1/organizations"),
+  const me = useMe();
+  const can = (p: string) => me.data?.permissions.includes(p) ?? false;
+
+  const users = useQuery({ queryKey: ["admin", "users"], queryFn: () => api.get<{ users: AdminUser[] }>("/api/v1/users"), enabled: can("users.manage") });
+  const departments = useQuery({ queryKey: ["departments"], queryFn: () => api.get<{ departments: Department[] }>("/api/v1/departments"), enabled: can("departments.read") });
+  const domains = useQuery({ queryKey: ["admin", "domains"], queryFn: () => api.get<{ domains: Domain[] }>("/api/v1/domains"), enabled: can("domains.manage") });
+  const mailboxes = useQuery({ queryKey: ["admin", "mailboxes"], queryFn: () => api.get<{ mailboxes: Mailbox[] }>("/api/v1/mailboxes"), enabled: can("mailboxes.manage") });
+  const quarantine = useQuery({ queryKey: ["admin", "quarantine"], queryFn: () => api.get<{ quarantine: unknown[] }>("/api/v1/quarantine"), enabled: can("security.manage") });
+  const blocks = useQuery({ queryKey: ["admin", "blocks"], queryFn: () => api.get<{ blocks: unknown[] }>("/api/v1/security/blocks"), enabled: can("security.manage") });
+
+  const activity = useQuery({
+    queryKey: ["admin", "audit", "recent"],
+    queryFn: () => api.get<{ entries: AuditEntry[]; total: number }>("/api/v1/audit?limit=9"),
+    enabled: can("audit.read"),
+    refetchInterval: 15_000,
   });
-  const domains = useQuery({
-    queryKey: ["admin", "domains"],
-    queryFn: () => api.get<{ domains: Domain[] }>("/api/v1/domains"),
+  const failedLogins = useQuery({
+    queryKey: ["admin", "audit", "failed-logins"],
+    queryFn: () => {
+      const from = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      return api.get<{ entries: AuditEntry[]; total: number }>(`/api/v1/audit?action=auth.login_failed&from=${encodeURIComponent(from)}&limit=1`);
+    },
+    enabled: can("audit.read"),
+    refetchInterval: 60_000,
   });
-  const users = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: () => api.get<{ users: AdminUser[] }>("/api/v1/users"),
-  });
-  const mailboxes = useQuery({
-    queryKey: ["admin", "mailboxes"],
-    queryFn: () => api.get<{ mailboxes: Mailbox[] }>("/api/v1/mailboxes"),
+  const health = useQuery({
+    queryKey: ["health"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/health/ready`, { cache: "no-store" });
+      return (await res.json()) as { status: string; checks: Record<string, string> };
+    },
+    refetchInterval: 30_000,
+    retry: false,
   });
 
-  if (orgs.isLoading || domains.isLoading || users.isLoading || mailboxes.isLoading) {
-    return <PageLoader label="Loading admin" />;
-  }
+  const userList = users.data?.users ?? [];
+  const activeUsers = userList.filter((u) => u.status === "active").length;
+  const domainList = domains.data?.domains ?? [];
+  const verifiedDomains = domainList.filter((d) => d.status === "verified").length;
+  const quarantineCount = quarantine.data?.quarantine?.length ?? 0;
+  const failedCount = failedLogins.data?.total ?? 0;
 
-  const cards = [
-    { label: "Organizations", value: orgs.data?.organizations.length ?? 0, href: "/admin/organizations" },
-    { label: "Domains", value: domains.data?.domains.length ?? 0, href: "/admin/domains" },
-    { label: "Users", value: users.data?.users.length ?? 0, href: "/admin/users" },
-    { label: "Mailboxes", value: mailboxes.data?.mailboxes.length ?? 0, href: "/admin/mailboxes" },
-  ];
-
-  const suite = [
-    { href: "/admin/security", label: "Security", note: "Quarantine and blocks" },
-    { href: "/admin/api-keys", label: "API Keys", note: "Programmatic access" },
-    { href: "/admin/webhooks", label: "Webhooks", note: "Delivery events" },
-    { href: "/admin/audit", label: "Audit", note: "Traceability layer" },
-  ];
+  const HEALTH_LABELS: Record<string, { label: string; icon: string }> = {
+    postgres: { label: "Database", icon: "database" },
+    redis: { label: "Cache / rate limiting", icon: "zap" },
+    nats: { label: "Event bus", icon: "activity" },
+    minio: { label: "Attachment storage", icon: "server" },
+  };
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="newsprint-texture border border-[#111111] bg-[#f9f9f7] p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Control Desk</p>
-        <div className="mt-4 grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-8">
-            <h1 className="font-serif text-[clamp(3rem,8vw,7rem)] leading-[0.9] tracking-tighter text-[#111111]">
-              QazEra Control
-            </h1>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-              Administrative operations are laid out with the clarity of a front page: metrics,
-              sections, and system responsibilities separated by visible editorial borders.
-            </p>
-          </div>
-          <div className="border border-[#111111] bg-[#e5e5e0] p-4 lg:col-span-4">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
-              01. System
-            </p>
-            <ol className="mt-4 space-y-2 text-sm leading-6 font-body">
-              <li>01. Create an organization.</li>
-              <li>02. Add and verify a domain.</li>
-              <li>03. Create users and mailboxes.</li>
-              <li>04. Wire API keys, SMTP, and webhooks.</li>
-            </ol>
-          </div>
+    <div>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Overview</h1>
+          <p className="page-description">Current state of your organization, mail infrastructure and security.</p>
         </div>
+        <div className="flex items-center gap-2">
+          {can("users.manage") && <Link href="/admin/users"><Button variant="secondary" size="sm"><Icon name="plus" className="h-3.5 w-3.5" /> New user</Button></Link>}
+          {can("bulk_email.create") && <Link href="/admin/bulk-email"><Button size="sm"><Icon name="megaphone" className="h-3.5 w-3.5" /> Broadcast</Button></Link>}
+        </div>
+      </header>
+
+      {/* Stat strip */}
+      <section className="flex flex-wrap overflow-hidden rounded-[10px] border border-border bg-surface-elevated">
+        {can("users.manage") && (
+          <StatCell
+            label="Users"
+            value={users.isLoading ? <Skeleton className="h-6 w-10" /> : userList.length}
+            sub={users.isSuccess ? `${activeUsers} active · ${userList.length - activeUsers} disabled` : undefined}
+            href="/admin/users"
+          />
+        )}
+        {can("departments.read") && (
+          <StatCell
+            label="Departments"
+            value={departments.isLoading ? <Skeleton className="h-6 w-10" /> : departments.data?.departments.length ?? 0}
+            sub={departments.isSuccess ? `${departments.data.departments.reduce((n, d) => n + d.employee_count, 0)} employees assigned` : undefined}
+            href="/admin/departments"
+          />
+        )}
+        {can("mailboxes.manage") && (
+          <StatCell
+            label="Mailboxes"
+            value={mailboxes.isLoading ? <Skeleton className="h-6 w-10" /> : mailboxes.data?.mailboxes.length ?? 0}
+            href="/admin/mailboxes"
+          />
+        )}
+        {can("domains.manage") && (
+          <StatCell
+            label="Domains"
+            value={domains.isLoading ? <Skeleton className="h-6 w-10" /> : domainList.length}
+            sub={domains.isSuccess ? `${verifiedDomains} verified` : undefined}
+            href="/admin/domains"
+          />
+        )}
+        {can("security.manage") && (
+          <StatCell
+            label="Quarantine"
+            value={quarantine.isLoading ? <Skeleton className="h-6 w-10" /> : quarantineCount}
+            sub="pending review"
+            href="/admin/security"
+          />
+        )}
+        {can("audit.read") && (
+          <StatCell
+            label="Failed logins"
+            value={failedLogins.isLoading ? <Skeleton className="h-6 w-10" /> : failedCount}
+            sub="last 24 hours"
+            href="/admin/audit"
+          />
+        )}
       </section>
 
-      <section className="grid gap-0 border border-[#111111] md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((c, idx) => (
-          <Link
-            key={c.label}
-            href={c.href}
-            className={cx(
-              "border-b border-[#111111] p-5 transition-colors hover:bg-[#111111] hover:text-[#f9f9f7] md:border-b-0",
-              idx < 3 && "md:border-r",
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        {/* Recent activity — live audit feed */}
+        {can("audit.read") && (
+          <section className="rounded-[10px] border border-border bg-surface-elevated">
+            <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <h2 className="text-[13px] font-semibold">Recent activity</h2>
+              <Link href="/admin/audit" className="text-xs font-medium text-primary hover:underline">Open Logs & Audit</Link>
+            </header>
+            {activity.isLoading && (
+              <div className="space-y-3 p-4">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-4" />)}</div>
             )}
-          >
-            <p className="font-serif text-4xl tracking-tight">{String(c.value).padStart(2, "0")}</p>
-            <p className="mt-4 font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000] hover:text-[#f9f9f7]">
-              {c.label}
-            </p>
-          </Link>
-        ))}
-      </section>
+            {activity.isSuccess && (activity.data.entries ?? []).length === 0 && (
+              <p className="p-6 text-center text-[13px] text-muted-foreground">No recorded events yet.</p>
+            )}
+            <ul className="divide-y divide-border/70">
+              {(activity.data?.entries ?? []).map((e) => {
+                const warning = e.action === "auth.login_failed" || /\.(delete|revoke)$/.test(e.action) || e.action === "security.block_sender";
+                const target = (e.detail && typeof e.detail.email === "string" && e.detail.email) || (e.detail && typeof e.detail.name === "string" && e.detail.name) || "";
+                return (
+                  <li key={e.id} className="flex items-center gap-3 px-4 py-2">
+                    <span className={cx("h-1.5 w-1.5 shrink-0 rounded-full", warning ? "bg-warning" : "bg-border-strong")} />
+                    <p className="min-w-0 flex-1 truncate text-[13px]">
+                      <span className="font-medium">{e.actor_email || "system"}</span>{" "}
+                      <span className="text-muted-foreground">{ACTION_TEXT[e.action] ?? e.action}</span>
+                      {target && <span className="text-muted-foreground"> “{target}”</span>}
+                    </p>
+                    <span className="shrink-0 text-[11px] text-faint">{timeAgo(e.created_at)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
-      <section className="grid gap-0 border border-[#111111] lg:grid-cols-2">
-        {suite.map((item, index) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cx(
-              "border-b border-[#111111] bg-[#f9f9f7] p-5 transition-colors hover:bg-[#cc0000] hover:text-white lg:border-b-0",
-              index % 2 === 0 && "lg:border-r",
-            )}
-          >
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000] hover:text-white">
-              Section
-            </p>
-            <h2 className="mt-3 font-serif text-3xl tracking-tight">{item.label}</h2>
-            <p className="mt-3 text-sm leading-6 font-body">{item.note}</p>
-          </Link>
-        ))}
-      </section>
+        <div className="space-y-4">
+          {/* System health — real readiness checks */}
+          <section className="rounded-[10px] border border-border bg-surface-elevated">
+            <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+              <h2 className="text-[13px] font-semibold">System health</h2>
+              {health.isSuccess && (
+                <Badge tone={health.data.status === "ok" ? "success" : "warning"}>
+                  {health.data.status === "ok" ? "Operational" : "Degraded"}
+                </Badge>
+              )}
+              {health.isError && <Badge tone="danger">Unreachable</Badge>}
+            </header>
+            <ul className="divide-y divide-border/70">
+              {Object.entries(HEALTH_LABELS).map(([key, meta]) => {
+                const state = health.data?.checks?.[key];
+                return (
+                  <li key={key} className="flex items-center gap-3 px-4 py-2 text-[13px]">
+                    <Icon name={meta.icon} className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="flex-1">{meta.label}</span>
+                    {health.isLoading ? (
+                      <Skeleton className="h-3 w-12" />
+                    ) : state === "ok" ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" /> OK</span>
+                    ) : state ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-danger" title={state}><span className="h-1.5 w-1.5 rounded-full bg-danger" /> Down</span>
+                    ) : (
+                      <span className="text-xs text-faint">unknown</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          {/* Security snapshot — real counters */}
+          {can("security.manage") && (
+            <section className="rounded-[10px] border border-border bg-surface-elevated">
+              <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                <h2 className="text-[13px] font-semibold">Security</h2>
+                <Link href="/admin/security" className="text-xs font-medium text-primary hover:underline">Security Center</Link>
+              </header>
+              <ul className="divide-y divide-border/70 text-[13px]">
+                <li className="flex items-center justify-between px-4 py-2">
+                  <span className="flex items-center gap-2.5"><Icon name="shield" className="h-3.5 w-3.5 text-muted-foreground" /> Messages in quarantine</span>
+                  <span className={cx("font-semibold tabular-nums", quarantineCount > 0 && "text-warning")}>{quarantineCount}</span>
+                </li>
+                <li className="flex items-center justify-between px-4 py-2">
+                  <span className="flex items-center gap-2.5"><Icon name="alert-octagon" className="h-3.5 w-3.5 text-muted-foreground" /> Blocked senders</span>
+                  <span className="font-semibold tabular-nums">{blocks.data?.blocks?.length ?? 0}</span>
+                </li>
+                {can("audit.read") && (
+                  <li className="flex items-center justify-between px-4 py-2">
+                    <span className="flex items-center gap-2.5"><Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground" /> Failed logins (24h)</span>
+                    <span className={cx("font-semibold tabular-nums", failedCount > 0 && "text-warning")}>{failedCount}</span>
+                  </li>
+                )}
+              </ul>
+            </section>
+          )}
+
+          {/* Quick access */}
+          <section className="rounded-[10px] border border-border bg-surface-elevated">
+            <header className="border-b border-border px-4 py-2.5">
+              <h2 className="text-[13px] font-semibold">Quick access</h2>
+            </header>
+            <ul className="divide-y divide-border/70">
+              {[
+                can("users.manage") && { href: "/admin/users", icon: "users", label: "Manage users", note: "Accounts, roles, departments" },
+                can("bulk_email.view_analytics") && { href: "/admin/bulk-email", icon: "megaphone", label: "Broadcast", note: "Mass email to departments" },
+                can("audit.read") && { href: "/admin/audit", icon: "scroll-text", label: "Logs & Audit", note: "Full event history" },
+                can("apikeys.manage") && { href: "/admin/api-keys", icon: "key", label: "API keys", note: "Programmatic access" },
+              ]
+                .filter((x): x is { href: string; icon: string; label: string; note: string } => Boolean(x))
+                .map((item) => (
+                  <li key={item.href}>
+                    <Link href={item.href} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-background">
+                      <Icon name={item.icon} className="h-4 w-4 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-medium leading-4">{item.label}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">{item.note}</span>
+                      </span>
+                      <Icon name="chevron-right" className="h-3.5 w-3.5 text-faint" />
+                    </Link>
+                  </li>
+                ))}
+            </ul>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

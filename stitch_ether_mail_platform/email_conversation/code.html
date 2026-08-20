@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EmailSaaS - Conversation View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#ecf1ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed": "#191c1e",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#e0e3e5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#2563eb",
+                        "on-background": "#111c2d",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "secondary": "#5c5f61",
+                        "tertiary": "#943700",
+                        "surface-container-high": "#dee8ff",
+                        "surface-bright": "#f9f9ff",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "outline-variant": "#c3c6d7",
+                        "surface-dim": "#cfdaf2",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#004ac6",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#263143",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-container": "#bc4800",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f3ff",
+                        "on-secondary-fixed-variant": "#444749",
+                        "outline": "#737686",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#111c2d",
+                        "surface-container": "#e7eeff",
+                        "on-primary-container": "#eeefff",
+                        "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "container-padding-desktop": "24px",
+                        "container-padding-mobile": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-[260px] bg-surface-container-low border-r border-outline-variant flex flex-col p-stack-md overflow-y-auto z-10 hidden md:flex">
+<div class="mb-stack-lg flex items-center gap-3 px-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold">E</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">EmailSaaS</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</p>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-medium transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inbox" style="font-variation-settings: 'FILL' 1;">inbox</span>
+<span class="font-body-md text-body-md">Inbox</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="send">send</span>
+<span class="font-body-md text-body-md">Sent</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="draft">draft</span>
+<span class="font-body-md text-body-md">Drafts</span>
+</a>
+<!-- Abbreviated list for brevity in this mock -->
+</div>
+<div class="mt-auto pt-stack-md border-t border-outline-variant">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col min-h-screen md:ml-[260px]">
+<!-- TopNavBar -->
+<header class="docked full-width top-0 h-14 bg-surface flex items-center justify-between w-full px-container-padding-desktop border-b border-outline-variant z-20">
+<div class="flex items-center gap-6">
+<!-- Mobile Menu Button -->
+<button class="md:hidden text-on-surface-variant p-2">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="relative w-64 hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full pl-9 pr-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-body-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-on-surface-variant" placeholder="Search emails..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden md:flex gap-4">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Docs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Changelog</a>
+</nav>
+<div class="h-6 w-px bg-outline-variant hidden md:block mx-2"></div>
+<button class="text-on-surface-variant hover:text-on-surface p-1.5 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface p-1.5 transition-colors hidden sm:block">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface p-1.5 transition-colors">
+<img class="w-7 h-7 rounded-full object-cover border border-outline-variant" data-alt="A small, professional headshot of an executive in a well-lit office setting. High key lighting, minimal background. Representing a user profile avatar in a light mode enterprise application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDf9ulqw8O1uqXEk3ge6n90FXBUly86jetBHBouy20xFbzUWqf2R2L_CZiUCmySOcVCp0ZSWeKDA7qZ-QqeEX3eceHcZ3XB-t6GbEbm1LN4XFSBtx0SBgmAyMoTxO5bzyHg18E_HxoCSQj637CzAMihb-lvhS5MwfxECPzUcJBEAir80gPisfm5pe2I1dRJ0UA_cRXrHhg9bvSpoOBwDTlS5DbD2xMp0g2xYIJ5-DxO0oMuXtFeh9w"/>
+</button>
+</div>
+</header>
+<!-- Conversation Canvas -->
+<main class="flex-1 bg-surface-container-lowest flex flex-col">
+<!-- Thread Toolbar -->
+<div class="h-14 border-b border-outline-variant px-container-padding-desktop flex items-center justify-between bg-surface sticky top-0 z-10">
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors mr-2 md:hidden">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors" title="Archive">
+<span class="material-symbols-outlined">archive</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors" title="Mark as Spam">
+<span class="material-symbols-outlined">report</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors" title="Delete">
+<span class="material-symbols-outlined">delete</span>
+</button>
+<div class="w-px h-5 bg-outline-variant mx-2"></div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors flex items-center gap-1" title="Move to folder">
+<span class="material-symbols-outlined">drive_file_move</span>
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors flex items-center gap-1" title="Labels">
+<span class="material-symbols-outlined">label</span>
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</button>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-body-sm text-body-sm">
+<span>1 of 42</span>
+<button class="p-1.5 hover:bg-surface-container rounded-md transition-colors disabled:opacity-50">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-1.5 hover:bg-surface-container rounded-md transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto p-container-padding-desktop">
+<div class="max-w-4xl mx-auto flex flex-col gap-stack-lg">
+<!-- Subject Header -->
+<div class="flex items-start justify-between gap-4">
+<h2 class="font-headline-lg text-headline-lg font-bold text-on-surface">Q3 Roadmap Review &amp; Resource Allocation</h2>
+<span class="px-2 py-1 rounded bg-surface-container-high text-on-surface-variant font-label-md text-label-md whitespace-nowrap mt-2">Inbox</span>
+</div>
+<!-- Conversation Thread -->
+<div class="flex flex-col gap-6">
+<!-- Older Message (Collapsed - stylized for minimalist UI) -->
+<div class="border border-outline-variant rounded-lg p-4 cursor-pointer hover:bg-surface-container-low transition-colors flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-md">SJ</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Sarah Jenkins</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate w-48 sm:w-96">Re: Q3 Roadmap Review - Preliminary thoughts...</span>
+</div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Oct 12</span>
+</div>
+<!-- Active Message (Expanded) -->
+<div class="border border-outline-variant rounded-lg bg-surface-container-lowest shadow-[0_4px_12px_rgba(0,0,0,0.02)] overflow-hidden">
+<!-- Message Header -->
+<div class="p-5 border-b border-outline-variant flex items-start justify-between bg-surface-bright">
+<div class="flex items-start gap-4">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Professional headshot of a middle-aged male software engineering manager in a brightly lit modern office. He is smiling gently, wearing a crisp light blue shirt. High quality corporate portrait photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSnPRUv9zyeJWQE7zo4YmbD2VtJ1x4Rwi3AAexvaExuPUhtu6wV2hbysgJFDpdi9b_yrzESNljK8hEX_5Yf1mqa3rOCrOzSlhQYn4XrNEyTPPBUhT9mDoPeHEVaOdmkgwPbbkxcEnFv1Qhz2ne5yINYRHNuHmoT1t9hCCr302HK0g2XZIDYiGRkb0w_qLoIJLJL6iNCZZlqczW1R-0OU-0FPBhf2n4UFbq0uMucVMeE4fw3Y6su0E"/>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-on-surface text-[14px]">David Chen</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">&lt;d.chen@emailsaas.com&gt;</span>
+</div>
+<div class="flex items-center gap-1 mt-0.5 text-on-surface-variant font-body-sm text-body-sm">
+<span>to</span>
+<span class="font-medium text-on-surface">Engineering Team</span>
+<span>,</span>
+<span class="font-medium text-on-surface">Sarah Jenkins</span>
+<button class="ml-1 text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-body-sm text-body-sm text-on-surface-variant whitespace-nowrap">Oct 14, 2:30 PM (2 days ago)</span>
+<div class="flex items-center gap-1">
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded transition-colors" title="Reply">
+<span class="material-symbols-outlined text-[20px]">reply</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded transition-colors" title="More options">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Message Body -->
+<div class="p-6 font-body-lg text-body-lg text-on-surface leading-relaxed">
+<p class="mb-4">Hi team,</p>
+<p class="mb-4">Following up on our discussions from last week regarding the Q3 roadmap. I've attached the finalized resource allocation spreadsheet for the new API Gateway migration project.</p>
+<p class="mb-4">Key takeaways:</p>
+<ul class="list-disc pl-6 mb-4 space-y-2 text-on-surface-variant">
+<li>Frontend resources are fully allocated until sprint 43.</li>
+<li>Backend API team needs to finalize the GraphQL schema by Friday.</li>
+<li>Security review is scheduled for the 22nd.</li>
+</ul>
+<p class="mb-6">Please review the attached document and let me know if there are any glaring issues before our all-hands on Thursday. We need to lock this in.</p>
+<div class="font-body-md text-body-md text-on-surface-variant mt-8 border-l-2 border-outline-variant pl-4">
+<p class="font-medium text-on-surface">David Chen</p>
+<p>Director of Engineering | EmailSaaS</p>
+</div>
+</div>
+<!-- Attachments Section -->
+<div class="p-4 border-t border-outline-variant bg-surface-bright">
+<span class="font-label-md text-label-md text-on-surface-variant mb-3 block">2 Attachments</span>
+<div class="flex flex-wrap gap-3">
+<div class="flex items-center gap-3 p-2 border border-outline-variant rounded-md bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer w-64">
+<div class="w-10 h-10 bg-error/10 text-error rounded flex items-center justify-center">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<div class="flex-1 overflow-hidden">
+<p class="font-body-sm text-body-sm font-medium text-on-surface truncate">Q3_Roadmap_Final.pdf</p>
+<p class="font-label-md text-label-md text-on-surface-variant">2.4 MB</p>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2 border border-outline-variant rounded-md bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer w-64">
+<div class="w-10 h-10 bg-primary/10 text-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined">table_chart</span>
+</div>
+<div class="flex-1 overflow-hidden">
+<p class="font-body-sm text-body-sm font-medium text-on-surface truncate">Resource_Allocation_v3.xlsx</p>
+<p class="font-label-md text-label-md text-on-surface-variant">845 KB</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Action Footer -->
+<div class="mt-4 flex gap-3 pb-8">
+<button class="px-5 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-label-md rounded-md hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">reply</span>
+                            Reply
+                        </button>
+<button class="px-5 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-label-md rounded-md hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">reply_all</span>
+                            Reply All
+                        </button>
+<button class="px-5 py-2.5 bg-surface-container-lowest border border-outline-variant text-on-surface font-label-md text-label-md rounded-md hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">forward</span>
+                            Forward
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

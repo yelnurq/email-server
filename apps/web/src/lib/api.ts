@@ -1,7 +1,10 @@
 // API client: thin fetch wrapper over the Go backend with cookie sessions
 // and the unified error envelope.
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// Use the same-origin Next.js proxy by default. This keeps browser auth and
+// attachment requests independent from the hostname used to open the web UI
+// (localhost, 127.0.0.1, or a LAN address) and avoids CORS-only failures.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/backend";
 
 export class ApiError extends Error {
   code: string;
@@ -57,6 +60,8 @@ export type Me = {
   display_name: string;
   tenant_id: string;
   organization_id?: string;
+  department_id?: string;
+  department_name?: string;
   roles: RoleGrant[];
   permissions: string[];
 };
@@ -165,7 +170,17 @@ export type Domain = {
 };
 export type AdminUser = {
   id: string; organization_id?: string; email: string; display_name: string;
-  status: string; mailbox_address?: string; created_at: string;
+  status: string; mailbox_address?: string; department_id?: string; department_name?: string; created_at: string;
+};
+export type Department = {
+  id: string; organization_id: string; name: string; description: string;
+  manager_user_id?: string; manager_name?: string; manager_email?: string;
+  employee_count: number; created_at: string;
+};
+export type DirectoryUser = {
+  id: string; display_name: string; email: string; mailbox_address: string;
+  department_id?: string; department_name?: string;
+  is_online?: boolean;
 };
 export type Mailbox = {
   id: string; organization_id: string; domain_id: string; user_id?: string; user_email?: string;

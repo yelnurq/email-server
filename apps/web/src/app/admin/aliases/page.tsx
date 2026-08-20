@@ -70,20 +70,19 @@ export default function AliasesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">04. Desk</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           Aliases
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-          Aliases redirect mail with the logic of a newsroom switchboard. They keep public-facing
-          addresses stable while routing content to the right mailbox.
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+          Aliases keep public-facing addresses stable while the people behind them change.
+          Mail sent to an alias is redirected to its target mailbox.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New alias</p>
+        <p className="text-base font-semibold text-foreground">New alias</p>
         <form
           className="mt-4 space-y-4"
           onSubmit={(e) => {
@@ -101,13 +100,13 @@ export default function AliasesPage() {
               />
             </div>
             <label className="block min-w-52">
-              <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+              <span className="mb-2 block text-xs font-medium text-muted-foreground">
                 Domain
               </span>
               <select
                 value={domainId}
                 onChange={(e) => setDomainId(e.target.value)}
-                className="w-full border-b-2 border-[#111111] bg-transparent px-3 py-2 font-mono text-sm text-[#111111] outline-none"
+                className="w-full border-b-2 border-border bg-transparent px-3 py-2 font-mono text-sm text-foreground outline-none"
               >
                 {verifiedDomains.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -122,18 +121,18 @@ export default function AliasesPage() {
           </div>
 
           <div>
-            <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+            <span className="mb-2 block text-xs font-medium text-muted-foreground">
               Delivers to
             </span>
             <div className="flex flex-wrap gap-2">
               {(mailboxes.data?.mailboxes ?? []).map((m) => (
                 <label
                   key={m.id}
-                  className="flex items-center gap-2 border border-[#111111] bg-[#e5e5e0] px-3 py-2 font-mono text-xs uppercase tracking-[0.18em]"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs"
                 >
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-[#111111]"
+                    className="h-4 w-4 accent-primary"
                     checked={targetIds.includes(m.id)}
                     onChange={(e) =>
                       setTargetIds((prev) =>
@@ -154,25 +153,25 @@ export default function AliasesPage() {
         <EmptyState title="No aliases yet" hint="Create the first routing rule for the paper desk." />
       )}
       {aliases.isSuccess && aliases.data.aliases.length > 0 && (
-        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+        <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+              <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Alias</th>
                 <th className="px-4 py-3 font-medium">Delivers to</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#111111]">
+            <tbody className="divide-y divide-border">
               {aliases.data.aliases.map((a) => (
                 <tr key={a.id}>
                   <td className="px-4 py-3 font-semibold">{a.address}</td>
-                  <td className="px-4 py-3 text-[#525252]">{a.targets.join(", ")}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{a.targets.join(", ")}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => toggle.mutate(a)}
-                      className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]"
+                      className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
                       title="Toggle status"
                     >
                       {a.status}

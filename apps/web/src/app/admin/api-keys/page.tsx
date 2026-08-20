@@ -51,20 +51,18 @@ export default function ApiKeysPage() {
   const availableScopes = ["emails:write", "emails:read", "webhooks:write"];
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">08. Access</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           API Keys
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-          API keys are the external circulation desk. They allow trusted systems to publish mail
-          or inspect events without using a browser session.
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+          API keys let trusted systems send mail and read delivery events programmatically, without a browser session.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New key</p>
+        <p className="text-base font-semibold text-foreground">New key</p>
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -79,11 +77,11 @@ export default function ApiKeysPage() {
             {availableScopes.map((scope) => (
               <label
                 key={scope}
-                className="flex items-center gap-2 border border-[#111111] bg-[#e5e5e0] px-3 py-2 font-mono text-xs uppercase tracking-[0.18em]"
+                className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs"
               >
                 <input
                   type="checkbox"
-                  className="h-4 w-4 accent-[#111111]"
+                  className="h-4 w-4 accent-primary"
                   checked={scopes.includes(scope)}
                   onChange={(e) =>
                     setScopes((prev) =>
@@ -102,14 +100,14 @@ export default function ApiKeysPage() {
       </section>
 
       {created && (
-        <section className="qazera-panel border-[#cc0000] bg-[#f9f9f7] p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">
+        <section className="qazera-panel border-danger bg-surface-elevated p-6">
+          <p className="text-base font-semibold text-foreground">
             Secret shown once
           </p>
           <p className="mt-2 text-sm leading-6 font-body">
             Save this secret now. It will not be shown again.
           </p>
-          <div className="mt-4 border border-[#111111] bg-white p-4 font-mono text-xs break-all">
+          <div className="mt-4 rounded-lg border border-border bg-muted p-4 font-mono text-xs break-all">
             <div>prefix: {created.prefix}</div>
             <div>secret: {created.secret}</div>
           </div>
@@ -120,14 +118,14 @@ export default function ApiKeysPage() {
       )}
 
       {keys.isLoading && <PageLoader label="Loading API keys" />}
-      {keys.isSuccess && keys.data.keys.length === 0 && (
+      {keys.isSuccess && (keys.data.keys ?? []).length === 0 && (
         <EmptyState title="No API keys yet" hint="Create one to use the Email API." />
       )}
-      {keys.isSuccess && keys.data.keys.length > 0 && (
-        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+      {keys.isSuccess && (keys.data.keys ?? []).length > 0 && (
+        <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+              <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Key</th>
                 <th className="px-4 py-3 font-medium">Scopes</th>
@@ -136,15 +134,15 @@ export default function ApiKeysPage() {
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#111111]">
-              {keys.data.keys.map((k) => (
+            <tbody className="divide-y divide-border">
+              {(keys.data.keys ?? []).map((k) => (
                 <tr key={k.id}>
                   <td className="px-4 py-3 font-semibold">{k.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.prefix}…</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.scopes.join(", ")}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.last_used_at || "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.prefix}…</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.scopes.join(", ")}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{k.last_used_at || "—"}</td>
                   <td className="px-4 py-3">
-                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {k.status}
                     </span>
                   </td>

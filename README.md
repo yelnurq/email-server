@@ -54,6 +54,10 @@ from `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` (see `.env`).
 Sign in at http://localhost:3000, then: Admin → add a development domain
 (e.g. `company.test`) → create users with mailboxes → users exchange mail.
 
+For local UI testing, `/login` includes two quick-login profiles configured by
+`NEXT_PUBLIC_DEMO_ADMIN_*` and `NEXT_PUBLIC_DEMO_USER_*`. These credentials are
+development-only and must not be enabled in a production build.
+
 ## End-to-end tests
 
 With infra + API + worker running:

@@ -27,27 +27,25 @@ export default function OrganizationsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">02. Method</p>
+    <div className="space-y-6">
+      <section className="mb-8">
         <div className="mt-4 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <h1 className="font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+            <h1 className="page-title">
               Organizations
             </h1>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-              Organizations anchor the tenant structure. Each one is a distinct editorial house
-              with its own domains, users, and message flows.
+            <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+              Organizations are the top-level tenants of the platform. Users, domains and mailboxes always belong to exactly one organization.
             </p>
           </div>
-          <div className="border border-[#111111] bg-[#e5e5e0] p-4 lg:col-span-4">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+          <div className="border border-border bg-surface p-4 lg:col-span-4">
+            <p className="text-xs font-medium text-muted-foreground">
               Created today
             </p>
-            <p className="mt-3 font-serif text-4xl text-[#111111]">
+            <p className="mt-3 font-serif text-4xl text-foreground">
               {orgs.data?.organizations.length ?? 0}
             </p>
-            <p className="mt-2 text-sm text-[#525252] font-body">
+            <p className="mt-2 text-sm text-muted-foreground font-body">
               Active organizations visible in the control plane.
             </p>
           </div>
@@ -55,7 +53,7 @@ export default function OrganizationsPage() {
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New entry</p>
+        <p className="text-base font-semibold text-foreground">New entry</p>
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -77,22 +75,22 @@ export default function OrganizationsPage() {
         <EmptyState title="No organizations yet" hint="Create the first tenant container to continue." />
       )}
       {orgs.isSuccess && orgs.data.organizations.length > 0 && (
-        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+        <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+              <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Slug</th>
                 <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#111111]">
+            <tbody className="divide-y divide-border">
               {orgs.data.organizations.map((o) => (
                 <tr key={o.id}>
-                  <td className="px-4 py-3 font-semibold text-[#111111]">{o.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{o.slug}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground">{o.name}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{o.slug}</td>
                   <td className="px-4 py-3">
-                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {o.status}
                     </span>
                   </td>

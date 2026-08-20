@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Domain Details - DNS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "inverse-on-surface": "#ecf1ff",
+                            "on-tertiary-container": "#ffede6",
+                            "on-secondary-fixed": "#191c1e",
+                            "on-tertiary-fixed": "#360f00",
+                            "surface-container-lowest": "#ffffff",
+                            "secondary-container": "#e0e3e5",
+                            "tertiary-fixed-dim": "#ffb596",
+                            "primary-fixed-dim": "#b4c5ff",
+                            "on-error": "#ffffff",
+                            "on-secondary-container": "#626567",
+                            "secondary-fixed": "#e0e3e5",
+                            "primary-container": "#2563eb",
+                            "on-background": "#111c2d",
+                            "primary-fixed": "#dbe1ff",
+                            "on-primary-fixed": "#00174b",
+                            "on-tertiary-fixed-variant": "#7d2d00",
+                            "on-primary": "#ffffff",
+                            "on-primary-fixed-variant": "#003ea8",
+                            "secondary": "#5c5f61",
+                            "tertiary": "#943700",
+                            "surface-container-high": "#dee8ff",
+                            "surface-bright": "#f9f9ff",
+                            "surface": "#f9f9ff",
+                            "secondary-fixed-dim": "#c4c7c9",
+                            "outline-variant": "#c3c6d7",
+                            "surface-dim": "#cfdaf2",
+                            "on-tertiary": "#ffffff",
+                            "primary": "#004ac6",
+                            "error": "#ba1a1a",
+                            "background": "#f9f9ff",
+                            "on-secondary": "#ffffff",
+                            "inverse-surface": "#263143",
+                            "tertiary-fixed": "#ffdbcd",
+                            "surface-tint": "#0053db",
+                            "on-surface-variant": "#434655",
+                            "inverse-primary": "#b4c5ff",
+                            "tertiary-container": "#bc4800",
+                            "on-error-container": "#93000a",
+                            "surface-container-low": "#f0f3ff",
+                            "on-secondary-fixed-variant": "#444749",
+                            "outline": "#737686",
+                            "surface-container-highest": "#d8e3fb",
+                            "error-container": "#ffdad6",
+                            "on-surface": "#111c2d",
+                            "surface-container": "#e7eeff",
+                            "on-primary-container": "#eeefff",
+                            "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "stack-lg": "32px",
+                            "stack-md": "16px",
+                            "gutter": "16px",
+                            "unit": "4px",
+                            "container-padding-desktop": "24px",
+                            "container-padding-mobile": "16px",
+                            "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                            "body-md": ["Inter"],
+                            "label-md": ["Inter"],
+                            "headline-lg": ["Inter"],
+                            "headline-md": ["Inter"],
+                            "body-sm": ["Inter"],
+                            "code-sm": ["JetBrains Mono"],
+                            "body-lg": ["Inter"],
+                            "headline-lg-mobile": ["Inter"],
+                            "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                            "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                            "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                            "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                            "code-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                            "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                            "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                            "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex font-body-md">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline fixed left-0 top-0 h-screen w-[260px] flex-col h-full p-stack-md overflow-y-auto">
+<div class="mb-8">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary mb-1">EmailSaaS</div>
+<div class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</div>
+</div>
+<ul class="space-y-1">
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span>Dashboard</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">inbox</span>Inbox</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">send</span>Sent</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">draft</span>Drafts</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">report</span>Spam</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">policy</span>Quarantine</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span>Email Logs</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary font-medium rounded-lg hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">domain</span>Domains</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">vpn_key</span>API Keys</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">settings_ethernet</span>SMTP</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">webhook</span>Webhooks</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">style</span>Templates</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">mark_email_read</span>Deliverability</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">insights</span>Analytics</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">verified_user</span>Reputation</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">security</span>Security Center</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">gpp_bad</span>Threats</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">report_problem</span>Abuse</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">group</span>Team</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">payments</span>Billing</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">rocket_launch</span>Deployments</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">history</span>Audit</a></li>
+<li><a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#"><span class="material-symbols-outlined text-[20px]">settings</span>Settings</a></li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 md:ml-[260px] min-h-screen flex flex-col w-full">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-background border-b border-outline-variant dark:border-outline docked full-width top-0 h-14 flex items-center justify-between w-full px-container-padding-desktop">
+<div class="flex items-center gap-6">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="pl-9 pr-4 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md text-body-sm font-body-sm focus:border-primary focus:ring-2 focus:ring-primary/20 w-64 transition-all" placeholder="Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden sm:flex items-center gap-4 mr-2">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Docs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Support</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Changelog</a>
+</nav>
+<button class="text-on-surface-variant hover:bg-surface-container-high p-1.5 rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]">notifications</span></button>
+<button class="text-on-surface-variant hover:bg-surface-container-high p-1.5 rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]">help</span></button>
+<button class="text-on-surface-variant hover:bg-surface-container-high p-1.5 rounded-full transition-colors"><span class="material-symbols-outlined text-[20px]">account_circle</span></button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-container-padding-mobile md:p-container-padding-desktop overflow-x-hidden">
+<!-- Header Section -->
+<div class="mb-stack-lg">
+<div class="flex items-center gap-3 mb-2 text-on-surface-variant">
+<a class="font-body-sm text-body-sm hover:text-primary transition-colors" href="#">Domains</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="font-body-sm text-body-sm text-on-surface">example.com</span>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">example.com</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage DNS records and delivery settings for this domain.</p>
+</div>
+<span class="px-2 py-1 bg-surface-container-high text-on-surface font-label-md text-label-md rounded border border-outline-variant flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-orange-400"></span> Pending Setup
+                    </span>
+</div>
+</div>
+<!-- Tabs -->
+<div class="border-b border-outline-variant mb-stack-lg flex overflow-x-auto hide-scrollbar">
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Overview</a>
+<a class="px-4 py-3 font-label-md text-label-md text-primary border-b-2 border-primary whitespace-nowrap" href="#">DNS</a>
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Sending</a>
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Inbound</a>
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Reputation</a>
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Events</a>
+<a class="px-4 py-3 font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap" href="#">Settings</a>
+</div>
+<!-- DNS Instructions Alert -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-4 mb-stack-lg flex gap-4">
+<span class="material-symbols-outlined text-primary mt-0.5">info</span>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface mb-1">Add these records to your DNS provider</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">To verify your domain and enable email sending, log in to your DNS provider (e.g., Cloudflare, GoDaddy, Route53) and add the records below. DNS changes may take up to 48 hours to propagate, though it typically takes only a few minutes.</p>
+</div>
+<div class="ml-auto pl-4">
+<button class="px-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-md text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors whitespace-nowrap">Verify Now</button>
+</div>
+</div>
+<!-- DNS Records Table / List -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-4 py-3 font-label-md text-label-md text-on-surface-variant w-[120px]">Type</th>
+<th class="px-4 py-3 font-label-md text-label-md text-on-surface-variant w-[250px]">Host / Name</th>
+<th class="px-4 py-3 font-label-md text-label-md text-on-surface-variant">Value</th>
+<th class="px-4 py-3 font-label-md text-label-md text-on-surface-variant w-[100px]">Status</th>
+<th class="px-4 py-3 font-label-md text-label-md text-on-surface-variant w-[60px]"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Verification TXT -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-4 py-4 align-top">
+<span class="px-2 py-1 bg-surface-container border border-outline-variant rounded text-on-surface font-code-sm text-code-sm">TXT</span>
+<div class="font-label-md text-label-md text-on-surface-variant mt-2">Verification</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">_emailsaas-verify.example.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">emailsaas-site-verification=a1b2c3d4e5f6g7h8i9j0</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="flex items-center gap-1.5 text-green-600">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="font-label-md text-label-md">Verified</span>
+</div>
+</td>
+<td class="px-4 py-4 align-top text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy Row"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+</td>
+</tr>
+<!-- SPF -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-4 py-4 align-top">
+<span class="px-2 py-1 bg-surface-container border border-outline-variant rounded text-on-surface font-code-sm text-code-sm">TXT</span>
+<div class="font-label-md text-label-md text-on-surface-variant mt-2">SPF</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">example.com</div>
+<div class="font-label-md text-label-md text-on-surface-variant mt-1">or @ (Root)</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">v=spf1 include:_spf.emailsaas.com ~all</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="flex items-center gap-1.5 text-orange-500">
+<span class="material-symbols-outlined text-[18px]">pending</span>
+<span class="font-label-md text-label-md">Pending</span>
+</div>
+</td>
+<td class="px-4 py-4 align-top text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy Row"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+</td>
+</tr>
+<!-- DKIM -->
+<tr class="hover:bg-surface-container/30 transition-colors border-l-2 border-l-transparent hover:border-l-primary">
+<td class="px-4 py-4 align-top">
+<span class="px-2 py-1 bg-surface-container border border-outline-variant rounded text-on-surface font-code-sm text-code-sm">CNAME</span>
+<div class="font-label-md text-label-md text-on-surface-variant mt-2">DKIM</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">esaas1._domainkey.example.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">dkim1.esaas.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="flex items-center gap-1.5 text-orange-500">
+<span class="material-symbols-outlined text-[18px]">pending</span>
+<span class="font-label-md text-label-md">Pending</span>
+</div>
+</td>
+<td class="px-4 py-4 align-top text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy Row"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+</td>
+</tr>
+<!-- Return-Path -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-4 py-4 align-top">
+<span class="px-2 py-1 bg-surface-container border border-outline-variant rounded text-on-surface font-code-sm text-code-sm">CNAME</span>
+<div class="font-label-md text-label-md text-on-surface-variant mt-2">Return-Path</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">bounces.example.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">rp.esaas.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="flex items-center gap-1.5 text-orange-500">
+<span class="material-symbols-outlined text-[18px]">pending</span>
+<span class="font-label-md text-label-md">Pending</span>
+</div>
+</td>
+<td class="px-4 py-4 align-top text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy Row"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+</td>
+</tr>
+<!-- DMARC -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="px-4 py-4 align-top">
+<span class="px-2 py-1 bg-surface-container border border-outline-variant rounded text-on-surface font-code-sm text-code-sm">TXT</span>
+<div class="font-label-md text-label-md text-on-surface-variant mt-2">DMARC</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">_dmarc.example.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="font-code-sm text-code-sm text-on-surface break-all">v=DMARC1; p=none; rua=mailto:dmarc-reports@example.com</div>
+</td>
+<td class="px-4 py-4 align-top">
+<div class="flex items-center gap-1.5 text-green-600">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span class="font-label-md text-label-md">Verified</span>
+</div>
+</td>
+<td class="px-4 py-4 align-top text-right">
+<button class="text-on-surface-variant hover:text-primary transition-colors" title="Copy Row"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="mt-4 text-center">
+<button class="font-label-md text-label-md text-primary hover:text-primary-container transition-colors inline-flex items-center gap-1">Advanced Settings (MTA-STS, TLS) <span class="material-symbols-outlined text-[16px]">expand_more</span></button>
+</div>
+</main>
+</div>
+</body></html>

@@ -24,7 +24,10 @@ import (
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auditapi"
 	"github.com/yelnurq/email-server/internal/auth"
+	"github.com/yelnurq/email-server/internal/bulkmail"
+	"github.com/yelnurq/email-server/internal/collab"
 	"github.com/yelnurq/email-server/internal/config"
+	"github.com/yelnurq/email-server/internal/departments"
 	"github.com/yelnurq/email-server/internal/domains"
 	"github.com/yelnurq/email-server/internal/emailapi"
 	"github.com/yelnurq/email-server/internal/events"
@@ -32,6 +35,7 @@ import (
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailbox"
 	"github.com/yelnurq/email-server/internal/messages"
+	"github.com/yelnurq/email-server/internal/official"
 	"github.com/yelnurq/email-server/internal/organization"
 	"github.com/yelnurq/email-server/internal/security"
 	"github.com/yelnurq/email-server/internal/server"
@@ -40,6 +44,7 @@ import (
 	"github.com/yelnurq/email-server/internal/tenant"
 	"github.com/yelnurq/email-server/internal/users"
 	"github.com/yelnurq/email-server/internal/webhooks"
+	"github.com/yelnurq/email-server/internal/worklist"
 )
 
 func main() {
@@ -95,7 +100,7 @@ func run() error {
 	}
 
 	auditLog := &audit.Logger{Pool: pool, Log: log}
-	authService := &auth.Service{Pool: pool}
+	authService := &auth.Service{Pool: pool, Log: log}
 	authHandlers := &auth.Handlers{
 		Service:      authService,
 		Limiter:      auth.NewLoginLimiter(rdb),
@@ -135,7 +140,14 @@ func run() error {
 	attachmentHandlers := &attachments.Handlers{Pool: pool, Store: store, Log: log}
 
 	orgHandlers := &organization.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	officialHandlers := &official.Handlers{Pool: pool, Audit: auditLog}
+	worklistHandlers := &worklist.Handlers{Pool: pool, Audit: auditLog}
+	go (&worklist.Processor{Pool: pool, NATS: nc, Log: log}).Run(ctx)
+	bulkHandlers := &bulkmail.Handlers{Pool: pool, Audit: auditLog}
+	go (&bulkmail.Processor{Pool: pool, Messages: messageService, Audit: auditLog, Log: log}).Run(ctx)
 	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	departmentHandlers := &departments.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	collabHandlers := &collab.Handlers{Pool: pool, NATS: nc, Log: log}
 	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	mailboxHandlers := &mailbox.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	aliasHandlers := &aliases.Handlers{Pool: pool, Audit: auditLog, Log: log}
@@ -176,6 +188,21 @@ func run() error {
 					Get("/users", userHandlers.List)
 				admin.With(auth.RequirePermission("users.manage")).
 					Post("/users", userHandlers.Create)
+				admin.With(auth.RequirePermission("users.manage")).
+					Patch("/users/{id}", userHandlers.Patch)
+
+				admin.With(auth.RequirePermission("departments.read")).
+					Get("/departments", departmentHandlers.List)
+				admin.With(auth.RequirePermission("departments.read")).
+					Get("/directory/users", departmentHandlers.Directory)
+
+				admin.Group(func(departments chi.Router) {
+					departments.Use(auth.RequirePermission("departments.manage"))
+					departments.Post("/departments", departmentHandlers.Create)
+					departments.Patch("/departments/{id}", departmentHandlers.Patch)
+					departments.Delete("/departments/{id}", departmentHandlers.Delete)
+					departments.Put("/departments/{id}/members", departmentHandlers.UpdateMembers)
+				})
 
 				admin.With(auth.RequirePermission("mailboxes.manage")).
 					Get("/mailboxes", mailboxHandlers.List)
@@ -228,6 +255,41 @@ func run() error {
 
 				admin.With(auth.RequirePermission("audit.read")).
 					Get("/audit", auditHandlers.List)
+
+				admin.Group(func(chat chi.Router) {
+					chat.Use(auth.RequirePermission("messages.send"))
+					chat.Get("/chat/conversations", collabHandlers.List)
+					chat.Post("/chat/conversations", collabHandlers.Create)
+					chat.Get("/chat/conversations/{id}/messages", collabHandlers.Messages)
+					chat.Post("/chat/conversations/{id}/messages", collabHandlers.Send)
+					chat.Patch("/chat/messages/{messageID}", collabHandlers.Edit)
+					chat.Delete("/chat/messages/{messageID}", collabHandlers.Delete)
+					chat.Post("/chat/messages/{messageID}/reactions", collabHandlers.React)
+					chat.Post("/chat/conversations/{id}/read", collabHandlers.MarkRead)
+					chat.Post("/chat/conversations/{id}/typing", collabHandlers.Typing)
+				})
+				admin.Get("/realtime", collabHandlers.Realtime)
+				admin.Get("/notifications", collabHandlers.Notifications)
+				admin.Post("/notifications/read-all", collabHandlers.ReadAllNotifications)
+				admin.Post("/notifications/{id}/read", collabHandlers.ReadNotification)
+				admin.Group(func(official chi.Router) {
+					official.Use(auth.RequirePermission("official.read"))
+					official.Get("/official", officialHandlers.List)
+					official.Post("/official", officialHandlers.Create)
+					official.Post("/official/{id}/read", officialHandlers.Read)
+					official.Post("/official/{id}/acknowledge", officialHandlers.Acknowledge)
+					official.Get("/official/{id}/stats", officialHandlers.Stats)
+				})
+				admin.Group(func(tasks chi.Router) {
+					tasks.Use(auth.RequirePermission("tasks.manage.self"))
+					tasks.Get("/tasks", worklistHandlers.List)
+					tasks.Post("/tasks", worklistHandlers.Create)
+					tasks.Patch("/tasks/{id}", worklistHandlers.Patch)
+					tasks.Delete("/tasks/{id}", worklistHandlers.Delete)
+				})
+				admin.With(auth.RequirePermission("bulk_email.view_analytics")).Get("/bulk-email", bulkHandlers.List)
+				admin.With(auth.RequirePermission("bulk_email.create")).Post("/bulk-email", bulkHandlers.Create)
+				admin.With(auth.RequirePermission("bulk_email.send")).Post("/bulk-email/{id}/send", bulkHandlers.Send)
 			})
 
 			// Developer Email API: authenticated by API key, not session.

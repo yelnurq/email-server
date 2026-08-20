@@ -38,20 +38,18 @@ export default function DomainsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">03. Registry</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           Domains
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-          Domains determine where mail belongs and how the platform reasons about identity. In
-          this system, verification is deliberately explicit.
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+          Sending and receiving domains for your organization. A domain must be verified before mailboxes can be provisioned on it.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New domain</p>
+        <p className="text-base font-semibold text-foreground">New domain</p>
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -63,13 +61,13 @@ export default function DomainsPage() {
             <Input label="Domain name" placeholder="company.test" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <label className="block min-w-52">
-            <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+            <span className="mb-2 block text-xs font-medium text-muted-foreground">
               Organization
             </span>
             <select
               value={orgId}
               onChange={(e) => setOrgId(e.target.value)}
-              className="w-full border-b-2 border-[#111111] bg-transparent px-3 py-2 font-mono text-sm text-[#111111] outline-none"
+              className="w-full border-b-2 border-border bg-transparent px-3 py-2 font-mono text-sm text-foreground outline-none"
             >
               {(orgs.data?.organizations ?? []).map((o) => (
                 <option key={o.id} value={o.id}>
@@ -82,7 +80,7 @@ export default function DomainsPage() {
             {create.isPending ? "Adding..." : "Add development domain"}
           </Button>
         </form>
-        <p className="mt-4 text-sm leading-6 text-[#525252] font-body">
+        <p className="mt-4 text-sm leading-6 text-muted-foreground font-body">
           Development domains such as <code className="font-mono">company.test</code> are
           verified immediately and work only inside this local platform.
         </p>
@@ -93,24 +91,24 @@ export default function DomainsPage() {
         <EmptyState title="No domains yet" hint="Add the first local development domain to continue." />
       )}
       {domains.isSuccess && domains.data.domains.length > 0 && (
-        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+        <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+              <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Domain</th>
                 <th className="px-4 py-3 font-medium">Organization</th>
                 <th className="px-4 py-3 font-medium">Mode</th>
                 <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#111111]">
+            <tbody className="divide-y divide-border">
               {domains.data.domains.map((d) => (
                 <tr key={d.id}>
                   <td className="px-4 py-3 font-semibold">{d.name}</td>
-                  <td className="px-4 py-3 text-[#525252]">{orgName(d.organization_id)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{d.verification_mode}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{orgName(d.organization_id)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{d.verification_mode}</td>
                   <td className="px-4 py-3">
-                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       {d.status}
                     </span>
                   </td>

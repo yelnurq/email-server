@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Compose Email - EmailSaaS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#ecf1ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed": "#191c1e",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#e0e3e5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#2563eb",
+                        "on-background": "#111c2d",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "secondary": "#5c5f61",
+                        "tertiary": "#943700",
+                        "surface-container-high": "#dee8ff",
+                        "surface-bright": "#f9f9ff",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "outline-variant": "#c3c6d7",
+                        "surface-dim": "#cfdaf2",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#004ac6",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#263143",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-container": "#bc4800",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f3ff",
+                        "on-secondary-fixed-variant": "#444749",
+                        "outline": "#737686",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#111c2d",
+                        "surface-container": "#e7eeff",
+                        "on-primary-container": "#eeefff",
+                        "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "container-padding-desktop": "24px",
+                        "container-padding-mobile": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="h-full bg-background text-on-surface font-body-md antialiased overflow-hidden flex items-center justify-center">
+<!-- Modal Overlay -->
+<div class="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-40 transition-opacity flex items-end sm:items-center justify-center p-0 sm:p-container-padding-desktop">
+<!-- Compose Window -->
+<div class="bg-surface-container-lowest w-full sm:w-[680px] h-[921px] sm:h-auto sm:max-h-[870px] rounded-t-xl sm:rounded-xl shadow-[0px_8px_24px_rgba(0,0,0,0.08)] border border-outline-variant flex flex-col relative z-50 animate-[slideUp_0.3s_ease-out_forwards] sm:animate-[scaleIn_0.2s_ease-out_forwards]">
+<!-- Header -->
+<div class="flex items-center justify-between px-container-padding-desktop h-14 border-b border-outline-variant bg-surface-container-lowest sm:rounded-t-xl shrink-0">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">New Message</h2>
+<div class="flex items-center gap-2">
+<button aria-label="Minimize" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">minimize</span>
+</button>
+<button aria-label="Open in new window" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">open_in_new</span>
+</button>
+<button aria-label="Close" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</div>
+<!-- Compose Form -->
+<div class="flex-1 overflow-y-auto flex flex-col custom-scrollbar">
+<!-- Recipient Fields -->
+<div class="px-container-padding-desktop py-unit border-b border-outline-variant flex flex-col group focus-within:bg-surface-bright transition-colors">
+<div class="flex items-start min-h-[40px]">
+<label class="font-label-md text-label-md text-on-surface-variant w-16 pt-3 shrink-0" for="to-field">To</label>
+<div class="flex-1 flex flex-wrap items-center gap-2 py-2">
+<!-- Example Chip -->
+<div class="flex items-center gap-1 bg-surface-container-highest px-2 py-1 rounded-full border border-outline-variant/50">
+<span class="font-body-sm text-body-sm text-on-surface">sarah@example.com</span>
+<button aria-label="Remove recipient" class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+<input class="flex-1 min-w-[120px] bg-transparent border-none focus:ring-0 p-0 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50 h-8" id="to-field" placeholder="" type="text"/>
+</div>
+<div class="flex items-center gap-2 pt-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+<button class="font-label-md text-label-md text-primary hover:bg-primary-container/10 px-2 py-1 rounded transition-colors" onclick="document.getElementById('cc-bcc-fields').classList.toggle('hidden')">Cc/Bcc</button>
+</div>
+</div>
+</div>
+<!-- Hidden CC/BCC Fields -->
+<div class="hidden" id="cc-bcc-fields">
+<div class="px-container-padding-desktop py-unit border-b border-outline-variant flex items-start min-h-[40px] focus-within:bg-surface-bright transition-colors">
+<label class="font-label-md text-label-md text-on-surface-variant w-16 pt-3 shrink-0" for="cc-field">Cc</label>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-0 font-body-md text-body-md text-on-surface py-2.5" id="cc-field" placeholder="" type="text"/>
+</div>
+<div class="px-container-padding-desktop py-unit border-b border-outline-variant flex items-start min-h-[40px] focus-within:bg-surface-bright transition-colors">
+<label class="font-label-md text-label-md text-on-surface-variant w-16 pt-3 shrink-0" for="bcc-field">Bcc</label>
+<input class="flex-1 bg-transparent border-none focus:ring-0 p-0 font-body-md text-body-md text-on-surface py-2.5" id="bcc-field" placeholder="" type="text"/>
+</div>
+</div>
+<!-- Subject Field -->
+<div class="px-container-padding-desktop border-b border-outline-variant flex items-center min-h-[48px] focus-within:bg-surface-bright transition-colors">
+<input class="w-full bg-transparent border-none focus:ring-0 p-0 font-headline-sm text-headline-sm text-on-surface placeholder:text-on-surface-variant/50 placeholder:font-body-md placeholder:font-normal" placeholder="Subject" type="text"/>
+</div>
+<!-- Rich Text Editor Area -->
+<div class="flex-1 p-container-padding-desktop relative">
+<textarea class="w-full h-full resize-none bg-transparent border-none focus:ring-0 p-0 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/50" placeholder="Write something meaningful..."></textarea>
+<!-- File Drop Overlay (Hidden by default, shown via JS on drag) -->
+<div class="absolute inset-0 bg-surface-container-highest/80 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg hidden items-center justify-center m-container-padding-desktop pointer-events-none" id="drop-zone">
+<div class="text-center">
+<span class="material-symbols-outlined text-[48px] text-primary mb-2">upload_file</span>
+<p class="font-headline-sm text-headline-sm text-primary">Drop files here to attach</p>
+</div>
+</div>
+</div>
+<!-- Attachments Zone (Visible if files attached) -->
+<div class="px-container-padding-desktop pb-stack-md flex gap-stack-sm overflow-x-auto hide-scrollbar">
+<!-- Example Attachment -->
+<div class="flex items-center gap-3 bg-surface-container py-2 px-3 rounded-lg border border-outline-variant/50 shrink-0 group">
+<div class="w-8 h-8 bg-error/10 text-error rounded flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface max-w-[120px] truncate">Q3_Report_Final.pdf</span>
+<span class="font-label-md text-label-md text-on-surface-variant text-[10px]">2.4 MB</span>
+</div>
+<button aria-label="Remove attachment" class="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all p-1">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bottom Toolbar & Actions -->
+<div class="px-container-padding-desktop py-stack-md border-t border-outline-variant bg-surface-container-lowest sm:rounded-b-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-stack-md shrink-0">
+<!-- Send Actions -->
+<div class="flex items-center gap-2 w-full sm:w-auto">
+<div class="flex rounded-lg shadow-sm w-full sm:w-auto">
+<button class="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-on-primary font-label-md text-label-md px-6 h-10 rounded-l-lg transition-colors flex items-center justify-center gap-2">
+<span>Send</span>
+<span class="material-symbols-outlined text-[16px]">send</span>
+</button>
+<div class="w-[1px] bg-white/20 h-10"></div>
+<button aria-label="More send options" class="bg-primary hover:bg-primary/90 text-on-primary px-2 h-10 rounded-r-lg transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">arrow_drop_down</span>
+</button>
+</div>
+</div>
+<!-- Formatting Toolbar -->
+<div class="flex items-center gap-1 overflow-x-auto hide-scrollbar w-full sm:w-auto pb-2 sm:pb-0">
+<button aria-label="Formatting options" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">text_format</span>
+</button>
+<div class="w-[1px] h-4 bg-outline-variant mx-1"></div>
+<button aria-label="Attach files" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">attach_file</span>
+</button>
+<button aria-label="Insert link" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">link</span>
+</button>
+<button aria-label="Insert emoji" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">sentiment_satisfied</span>
+</button>
+<button aria-label="Insert image" class="p-2 rounded hover:bg-surface-container text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">image</span>
+</button>
+<div class="w-[1px] h-4 bg-outline-variant mx-1"></div>
+<button aria-label="Discard draft" class="p-2 rounded hover:bg-surface-container hover:text-error text-on-surface-variant transition-colors ml-auto sm:ml-2">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<style>
+        /* Custom Animations */
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Utility styles for scrollbars */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: theme('colors.outline-variant');
+            border-radius: 10px;
+        }
+    </style>
+<script>
+        // Simple drag and drop visual feedback
+        const composeArea = document.querySelector('.flex-1.p-container-padding-desktop.relative');
+        const dropZone = document.getElementById('drop-zone');
+
+        if (composeArea && dropZone) {
+            composeArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('hidden');
+                dropZone.classList.add('flex');
+            });
+
+            composeArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('hidden');
+                dropZone.classList.remove('flex');
+            });
+
+            composeArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('hidden');
+                dropZone.classList.remove('flex');
+                // Handle file drop logic here in real app
+            });
+        }
+    </script>
+</body></html>

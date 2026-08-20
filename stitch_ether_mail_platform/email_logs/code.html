@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Email Logs - EmailSaaS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#ecf1ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed": "#191c1e",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#e0e3e5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#2563eb",
+                        "on-background": "#111c2d",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "secondary": "#5c5f61",
+                        "tertiary": "#943700",
+                        "surface-container-high": "#dee8ff",
+                        "surface-bright": "#f9f9ff",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "outline-variant": "#c3c6d7",
+                        "surface-dim": "#cfdaf2",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#004ac6",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#263143",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-container": "#bc4800",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f3ff",
+                        "on-secondary-fixed-variant": "#444749",
+                        "outline": "#737686",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#111c2d",
+                        "surface-container": "#e7eeff",
+                        "on-primary-container": "#eeefff",
+                        "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "container-padding-desktop": "24px",
+                        "container-padding-mobile": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .table-container {
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-outline-variant) transparent;
+        }
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background-color: #c3c6d7;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased overflow-hidden flex h-screen">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low dark:bg-inverse-surface fixed left-0 top-0 h-screen w-[260px] border-r border-outline-variant dark:border-outline flex flex-col p-stack-md overflow-y-auto hidden md:flex z-20">
+<div class="mb-stack-lg flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary text-on-primary flex items-center justify-center font-bold">
+                E
+            </div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">EmailSaaS</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</p>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="inbox">inbox</span>
+<span class="font-label-md text-label-md">Inbox</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+<span class="font-label-md text-label-md">Sent</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="draft">draft</span>
+<span class="font-label-md text-label-md">Drafts</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="report">report</span>
+<span class="font-label-md text-label-md">Spam</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="policy">policy</span>
+<span class="font-label-md text-label-md">Quarantine</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary font-medium rounded-lg opacity-90 transition-opacity" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-md text-label-md">Email Logs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="domain">domain</span>
+<span class="font-label-md text-label-md">Domains</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="vpn_key">vpn_key</span>
+<span class="font-label-md text-label-md">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings_ethernet">settings_ethernet</span>
+<span class="font-label-md text-label-md">SMTP</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="webhook">webhook</span>
+<span class="font-label-md text-label-md">Webhooks</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="style">style</span>
+<span class="font-label-md text-label-md">Templates</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-[260px] w-full md:w-[calc(100%-260px)] h-screen">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-background docked full-width top-0 h-14 border-b border-outline-variant dark:border-outline flex items-center justify-between w-full px-container-padding-desktop shrink-0 z-10">
+<div class="flex items-center gap-6 h-full">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]" data-icon="search">search</span>
+<input class="pl-9 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-64 transition-all" placeholder="Search resources..." type="text"/>
+</div>
+<nav class="hidden lg:flex items-center gap-6 h-full">
+<a class="h-full flex items-center font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Docs</a>
+<a class="h-full flex items-center font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Support</a>
+<a class="h-full flex items-center font-label-md text-label-md text-on-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors" href="#">Changelog</a>
+</nav>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+</button>
+<button class="hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+</button>
+<button class="hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-container-padding-mobile md:p-container-padding-desktop bg-surface-container-lowest">
+<!-- Header & Filters -->
+<div class="mb-stack-lg flex flex-col lg:flex-row lg:items-end justify-between gap-stack-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-1">Email Logs</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Monitor and troubleshoot message delivery in real-time.</p>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<div class="relative">
+<select class="appearance-none bg-surface border border-outline-variant text-on-surface font-body-sm text-body-sm rounded-lg py-2 pl-3 pr-8 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-[140px]">
+<option>All Statuses</option>
+<option>Delivered</option>
+<option>Queued</option>
+<option>Bounced</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant text-[16px]" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+<div class="relative">
+<select class="appearance-none bg-surface border border-outline-variant text-on-surface font-body-sm text-body-sm rounded-lg py-2 pl-3 pr-8 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-[160px]">
+<option>All Domains</option>
+<option>acme.com</option>
+<option>example.org</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant text-[16px]" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[16px]" data-icon="calendar_today">calendar_today</span>
+<input class="pl-9 pr-3 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none w-[160px]" placeholder="Last 7 Days" type="text"/>
+</div>
+<button class="bg-primary-container text-on-primary rounded-lg px-4 py-2 font-label-md text-label-md flex items-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[16px]" data-icon="filter_list">filter_list</span>
+                        More Filters
+                    </button>
+</div>
+</div>
+<!-- Data Table -->
+<div class="bg-surface border border-outline-variant rounded-lg overflow-hidden flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
+<div class="table-container flex-1 overflow-auto">
+<table class="w-full text-left border-collapse whitespace-nowrap">
+<thead class="bg-surface-container-low sticky top-0 z-10">
+<tr>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Status</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Recipient</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Sender</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Subject</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Domain</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium">Message ID</th>
+<th class="font-label-md text-label-md text-on-surface-variant py-3 px-4 border-b border-outline-variant font-medium text-right">Time</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 transition-colors group cursor-pointer">
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-label-md text-[11px] border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                        Delivered
+                                    </span>
+</td>
+<td class="py-3 px-4 text-on-surface font-medium">user@client.com</td>
+<td class="py-3 px-4 text-on-surface-variant">billing@acme.com</td>
+<td class="py-3 px-4 text-on-surface truncate max-w-[200px]">Your Invoice #INV-2023-11</td>
+<td class="py-3 px-4 text-on-surface-variant">acme.com</td>
+<td class="py-3 px-4 font-code-sm text-code-sm text-on-surface-variant truncate max-w-[120px]">msg_01HFWX...</td>
+<td class="py-3 px-4 text-on-surface-variant text-right">Just now</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 transition-colors group cursor-pointer">
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-label-md text-[11px] border border-amber-200">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        Queued
+                                    </span>
+</td>
+<td class="py-3 px-4 text-on-surface font-medium">support@help.org</td>
+<td class="py-3 px-4 text-on-surface-variant">alerts@acme.com</td>
+<td class="py-3 px-4 text-on-surface truncate max-w-[200px]">System Alert: High CPU Usage</td>
+<td class="py-3 px-4 text-on-surface-variant">acme.com</td>
+<td class="py-3 px-4 font-code-sm text-code-sm text-on-surface-variant truncate max-w-[120px]">msg_01HFWY...</td>
+<td class="py-3 px-4 text-on-surface-variant text-right">2 min ago</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 transition-colors group cursor-pointer">
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-label-md text-[11px] border border-red-200">
+<span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                        Bounced
+                                    </span>
+</td>
+<td class="py-3 px-4 text-on-surface font-medium">invalid.address@test.com</td>
+<td class="py-3 px-4 text-on-surface-variant">marketing@acme.com</td>
+<td class="py-3 px-4 text-on-surface truncate max-w-[200px]">Q4 Newsletter</td>
+<td class="py-3 px-4 text-on-surface-variant">acme.com</td>
+<td class="py-3 px-4 font-code-sm text-code-sm text-on-surface-variant truncate max-w-[120px]">msg_01HFWZ...</td>
+<td class="py-3 px-4 text-on-surface-variant text-right">15 min ago</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50 transition-colors group cursor-pointer">
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-label-md text-[11px] border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                        Delivered
+                                    </span>
+</td>
+<td class="py-3 px-4 text-on-surface font-medium">admin@partner.io</td>
+<td class="py-3 px-4 text-on-surface-variant">system@acme.com</td>
+<td class="py-3 px-4 text-on-surface truncate max-w-[200px]">Weekly Digest</td>
+<td class="py-3 px-4 text-on-surface-variant">acme.com</td>
+<td class="py-3 px-4 font-code-sm text-code-sm text-on-surface-variant truncate max-w-[120px]">msg_01HGWA...</td>
+<td class="py-3 px-4 text-on-surface-variant text-right">1 hr ago</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="bg-surface border-t border-outline-variant px-4 py-3 flex items-center justify-between shrink-0">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Showing 1 to 4 of 1,234 entries</span>
+<div class="flex items-center gap-2">
+<button class="p-1 text-on-surface-variant hover:bg-surface-container rounded transition-colors" disabled="">
+<span class="material-symbols-outlined text-[18px]" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="p-1 text-on-surface hover:bg-surface-container rounded transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

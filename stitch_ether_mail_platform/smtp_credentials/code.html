@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SMTP Credentials - EmailSaaS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-on-surface": "#ecf1ff",
+                      "on-tertiary-container": "#ffede6",
+                      "on-secondary-fixed": "#191c1e",
+                      "on-tertiary-fixed": "#360f00",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#e0e3e5",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-error": "#ffffff",
+                      "on-secondary-container": "#626567",
+                      "secondary-fixed": "#e0e3e5",
+                      "primary-container": "#2563eb",
+                      "on-background": "#111c2d",
+                      "primary-fixed": "#dbe1ff",
+                      "on-primary-fixed": "#00174b",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "secondary": "#5c5f61",
+                      "tertiary": "#943700",
+                      "surface-container-high": "#dee8ff",
+                      "surface-bright": "#f9f9ff",
+                      "surface": "#f9f9ff",
+                      "secondary-fixed-dim": "#c4c7c9",
+                      "outline-variant": "#c3c6d7",
+                      "surface-dim": "#cfdaf2",
+                      "on-tertiary": "#ffffff",
+                      "primary": "#004ac6",
+                      "error": "#ba1a1a",
+                      "background": "#f9f9ff",
+                      "on-secondary": "#ffffff",
+                      "inverse-surface": "#263143",
+                      "tertiary-fixed": "#ffdbcd",
+                      "surface-tint": "#0053db",
+                      "on-surface-variant": "#434655",
+                      "inverse-primary": "#b4c5ff",
+                      "tertiary-container": "#bc4800",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#f0f3ff",
+                      "on-secondary-fixed-variant": "#444749",
+                      "outline": "#737686",
+                      "surface-container-highest": "#d8e3fb",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#111c2d",
+                      "surface-container": "#e7eeff",
+                      "on-primary-container": "#eeefff",
+                      "surface-variant": "#d8e3fb"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-lg": "32px",
+                      "stack-md": "16px",
+                      "gutter": "16px",
+                      "unit": "4px",
+                      "container-padding-desktop": "24px",
+                      "container-padding-mobile": "16px",
+                      "stack-sm": "8px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "code-sm": ["JetBrains Mono"],
+                      "body-lg": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "headline-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "code-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low dark:bg-inverse-surface fixed left-0 top-0 h-screen w-[260px] border-r border-outline-variant dark:border-outline flex flex-col h-full p-stack-md overflow-y-auto hidden md:flex z-20">
+<div class="mb-stack-lg flex items-center gap-3 px-3">
+<div class="w-8 h-8 rounded bg-primary-container text-on-primary-container flex items-center justify-center font-bold">E</div>
+<div>
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">EmailSaaS</div>
+<div class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</div>
+</div>
+</div>
+<div class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inbox">inbox</span>
+<span class="font-body-md text-body-md">Inbox</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings_ethernet">settings_ethernet</span>
+<span class="font-body-md text-body-md">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary font-medium transition-colors opacity-90" href="#">
+<span class="material-symbols-outlined" data-icon="settings_ethernet">settings_ethernet</span>
+<span class="font-body-md text-body-md">SMTP</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col md:ml-[260px] h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-background docked full-width top-0 h-14 border-b border-outline-variant dark:border-outline flex items-center justify-between w-full px-container-padding-desktop z-10 shrink-0">
+<div class="flex items-center gap-6">
+<!-- Mobile Menu Button -->
+<button class="md:hidden text-on-surface-variant p-2 -ml-2 rounded-lg hover:bg-surface-container">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
+<input class="pl-9 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-md font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 w-64" placeholder="Search resources..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden lg:flex items-center gap-4 mr-4">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Docs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support</a>
+</nav>
+<button class="text-on-surface-variant hover:bg-surface-container p-1.5 rounded-full transition-colors relative">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden cursor-pointer">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a user in a modern office environment, warm lighting, shallow depth of field, minimalist composition, corporate context, subtle cool tones in the background to match the technical UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAd42aV71JvUeyNCk4cHrtCgPVrfKvJw7lJdLekAKWYfFfk0oBCLPyUn68LvsE9SD8BZ-GSX0_NbTRalwL7hTMr9Hr24bYucgBphzzhx2Ksua9RsgBKwyPQ6TLqjGoReXtnUFxbZBErv-4yeyPffraYxThlNInBFWo5vbAEpGWlYK_U5aiTkQBtP3-Trx03xa8BcJ_u7Uvw1szYwViZexNbiCqU2aI2rvQJ7paJqVhMj2ZEyRDdgUQ"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto bg-surface-container-lowest p-container-padding-desktop">
+<div class="max-w-7xl mx-auto space-y-stack-lg">
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-1">SMTP Credentials</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage credentials for SMTP injection. Rotate keys periodically for security.</p>
+</div>
+<button class="bg-primary-container text-on-primary-container font-label-md text-label-md px-4 py-2 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        Create SMTP Credential
+                    </button>
+</div>
+<!-- Data Table -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-low/50">
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Credential Name</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Username</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Allowed Domains</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Status</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Created</th>
+<th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm divide-y divide-outline-variant/50">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="py-3 px-4">
+<div class="font-medium text-on-surface">Marketing Automation</div>
+<div class="text-on-surface-variant text-[11px] mt-0.5">ID: smtp_9a8b7c6d</div>
+</td>
+<td class="py-3 px-4">
+<div class="font-code-sm text-code-sm bg-surface-container-low px-2 py-1 rounded border border-outline-variant inline-block text-on-surface-variant">
+                                            user_prod_mktg
+                                        </div>
+</td>
+<td class="py-3 px-4">
+<div class="flex gap-1 flex-wrap">
+<span class="px-2 py-0.5 rounded-full border border-outline-variant bg-surface-container-lowest text-[11px] text-on-surface-variant">emailsaas.com</span>
+<span class="px-2 py-0.5 rounded-full border border-outline-variant bg-surface-container-lowest text-[11px] text-on-surface-variant">marketing.emailsaas.com</span>
+</div>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-container-high text-[#006847] border border-[#006847]/20 font-medium text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#006847]"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">
+                                        Oct 12, 2023
+                                    </td>
+<td class="py-3 px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors" title="Rotate Key">
+<span class="material-symbols-outlined text-[18px]">autorenew</span>
+</button>
+<button class="p-1.5 text-error hover:bg-error-container/30 rounded-md transition-colors" title="Revoke">
+<span class="material-symbols-outlined text-[18px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="py-3 px-4">
+<div class="font-medium text-on-surface">Transactional Core</div>
+<div class="text-on-surface-variant text-[11px] mt-0.5">ID: smtp_1x2y3z4w</div>
+</td>
+<td class="py-3 px-4">
+<div class="font-code-sm text-code-sm bg-surface-container-low px-2 py-1 rounded border border-outline-variant inline-block text-on-surface-variant">
+                                            user_prod_tx
+                                        </div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface-variant italic text-[11px]">Any domain</span>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-container-high text-[#006847] border border-[#006847]/20 font-medium text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#006847]"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">
+                                        Sep 01, 2023
+                                    </td>
+<td class="py-3 px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors" title="Rotate Key">
+<span class="material-symbols-outlined text-[18px]">autorenew</span>
+</button>
+<button class="p-1.5 text-error hover:bg-error-container/30 rounded-md transition-colors" title="Revoke">
+<span class="material-symbols-outlined text-[18px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 (Revoked) -->
+<tr class="bg-surface-container-lowest opacity-75">
+<td class="py-3 px-4">
+<div class="font-medium text-on-surface-variant line-through">Legacy CRM App</div>
+<div class="text-on-surface-variant text-[11px] mt-0.5">ID: smtp_legacy88</div>
+</td>
+<td class="py-3 px-4">
+<div class="font-code-sm text-code-sm text-on-surface-variant">
+                                            user_old_crm
+                                        </div>
+</td>
+<td class="py-3 px-4">
+<span class="text-on-surface-variant text-[11px]">-</span>
+</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-container-high text-error border border-error/20 font-medium text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                            Revoked
+                                        </span>
+</td>
+<td class="py-3 px-4 text-on-surface-variant">
+                                        Jan 15, 2022
+                                    </td>
+<td class="py-3 px-4 text-right">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface rounded-md transition-colors" title="Delete record">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

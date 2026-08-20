@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Webhooks - EmailSaaS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#ecf1ff",
+                        "on-tertiary-container": "#ffede6",
+                        "on-secondary-fixed": "#191c1e",
+                        "on-tertiary-fixed": "#360f00",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#e0e3e5",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#626567",
+                        "secondary-fixed": "#e0e3e5",
+                        "primary-container": "#2563eb",
+                        "on-background": "#111c2d",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed": "#00174b",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "secondary": "#5c5f61",
+                        "tertiary": "#943700",
+                        "surface-container-high": "#dee8ff",
+                        "surface-bright": "#f9f9ff",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "outline-variant": "#c3c6d7",
+                        "surface-dim": "#cfdaf2",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#004ac6",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9ff",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#263143",
+                        "tertiary-fixed": "#ffdbcd",
+                        "surface-tint": "#0053db",
+                        "on-surface-variant": "#434655",
+                        "inverse-primary": "#b4c5ff",
+                        "tertiary-container": "#bc4800",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f3ff",
+                        "on-secondary-fixed-variant": "#444749",
+                        "outline": "#737686",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#111c2d",
+                        "surface-container": "#e7eeff",
+                        "on-primary-container": "#eeefff",
+                        "surface-variant": "#d8e3fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "gutter": "16px",
+                        "unit": "4px",
+                        "container-padding-desktop": "24px",
+                        "container-padding-mobile": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-full flex antialiased">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-[260px] bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flex flex-col p-stack-md overflow-y-auto hidden md:flex z-50">
+<div class="flex items-center gap-3 mb-8 px-2">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
+                E
+            </div>
+<div>
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">EmailSaaS</div>
+<div class="font-label-md text-label-md text-on-surface-variant">Enterprise Tier</div>
+</div>
+</div>
+<ul class="flex flex-col gap-1 space-y-1 w-full">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="inbox">inbox</span>
+                    Inbox
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+                    Sent
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="webhook">webhook</span>
+                    Webhooks
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container dark:hover:bg-on-surface-variant hover:bg-secondary-container/50 dark:hover:bg-secondary/50 transition-colors rounded-lg font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-0 md:ml-[260px] flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="flex items-center justify-between w-full px-container-padding-desktop bg-surface dark:bg-background border-b border-outline-variant dark:border-outline docked full-width top-0 h-14 sticky z-40">
+<div class="flex items-center gap-6">
+<!-- Search -->
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-2.5 top-2 text-outline text-[18px]" data-icon="search">search</span>
+<input class="w-64 pl-9 pr-4 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-md font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Search resources..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden sm:flex gap-6">
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors font-label-md text-label-md" href="#">Docs</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors font-label-md text-label-md" href="#">Support</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-on-surface dark:hover:text-inverse-on-surface transition-colors font-label-md text-label-md" href="#">Changelog</a>
+</nav>
+<div class="flex items-center gap-2 border-l border-outline-variant pl-4 ml-2">
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="help">help</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container rounded-md transition-colors"><span class="material-symbols-outlined text-[20px]" data-icon="account_circle">account_circle</span></button>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-container-padding-mobile md:p-container-padding-desktop bg-surface-container-lowest">
+<!-- Header Section -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-stack-lg">
+<div>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Webhooks</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Configure endpoints to receive real-time email event notifications.</p>
+</div>
+<button class="inline-flex items-center justify-center gap-2 bg-primary-container text-on-primary-container hover:opacity-90 px-4 py-2 rounded-lg font-label-md text-label-md transition-all self-start sm:self-auto">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                    Add Webhook
+                </button>
+</div>
+<!-- Content Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-gutter">
+<!-- Main Webhooks List -->
+<div class="xl:col-span-2 space-y-stack-md">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Configured Endpoints</h2>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-lowest font-label-md text-label-md text-on-surface-variant">
+<th class="px-6 py-3 font-medium">Endpoint URL</th>
+<th class="px-6 py-3 font-medium">Status</th>
+<th class="px-6 py-3 font-medium">Events</th>
+<th class="px-6 py-3 font-medium text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]" data-icon="link">link</span>
+<span class="font-code-sm text-code-sm truncate max-w-[200px]" title="https://api.example.com/v1/webhooks/inbound">https://api.example.com/v1/webhooks/inbound</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#ecfdf5] text-[#065f46] border border-[#a7f3d0]">
+                                                Enabled
+                                            </span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">Sent, Delivered, Opened</td>
+<td class="px-6 py-4 text-right">
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]" data-icon="edit">edit</span></button>
+<button class="p-1 text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]" data-icon="delete">delete</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]" data-icon="link_off">link_off</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant line-through truncate max-w-[200px]" title="https://legacy.example.com/hooks/mail">https://legacy.example.com/hooks/mail</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline-variant">
+                                                Disabled
+                                            </span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">Bounced, Spam</td>
+<td class="px-6 py-4 text-right">
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]" data-icon="edit">edit</span></button>
+<button class="p-1 text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100"><span class="material-symbols-outlined text-[18px]" data-icon="delete">delete</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- History / Logs Side Panel -->
+<div class="xl:col-span-1">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden h-full flex flex-col">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface flex justify-between items-center">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Recent Deliveries</h2>
+<button class="text-primary hover:underline font-label-md text-label-md">View All</button>
+</div>
+<div class="p-4 flex-1 overflow-y-auto space-y-3 bg-surface-bright">
+<!-- Log Item 1 -->
+<div class="p-3 border border-outline-variant rounded-md bg-surface-container-lowest hover:border-primary/30 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#ecfdf5] text-[#065f46]">
+<span class="material-symbols-outlined text-[12px]" data-icon="check">check</span>
+</span>
+<span class="font-label-md text-label-md text-on-surface">200 OK</span>
+</div>
+<span class="font-body-sm text-[11px] text-on-surface-variant">2 mins ago</span>
+</div>
+<div class="font-code-sm text-code-sm text-on-surface-variant truncate mb-1">POST /v1/webhooks/inbound</div>
+<div class="flex justify-between items-center text-[11px] text-on-surface-variant">
+<span>Event: email.delivered</span>
+<span>Retries: 0</span>
+</div>
+</div>
+<!-- Log Item 2 -->
+<div class="p-3 border border-error/30 rounded-md bg-[#fffbfa] hover:border-error/50 transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-error-container text-on-error-container">
+<span class="material-symbols-outlined text-[12px]" data-icon="priority_high">priority_high</span>
+</span>
+<span class="font-label-md text-label-md text-error">503 Service Unavailable</span>
+</div>
+<span class="font-body-sm text-[11px] text-on-surface-variant">15 mins ago</span>
+</div>
+<div class="font-code-sm text-code-sm text-on-surface-variant truncate mb-1">POST /v1/webhooks/inbound</div>
+<div class="flex justify-between items-center text-[11px] text-on-surface-variant">
+<span>Event: email.opened</span>
+<span class="text-error">Retries: 2</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

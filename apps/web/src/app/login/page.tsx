@@ -1,140 +1,217 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
-import { api, ApiError } from "@/lib/api";
-import { Button, Input, Spinner } from "@/components/ui";
+import { API_URL, api, ApiError } from "@/lib/api";
+import { LocaleSwitcher, useI18n } from "@/components/providers";
+import { Button, Spinner, cx } from "@/components/ui";
+import { Icon } from "@/components/icons";
 
-const schema = z.object({
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
+const schema = z.object({ email: z.string().email("Enter a valid email address"), password: z.string().min(1, "Password is required") });
+const QUICK_ACCOUNTS = [
+  { kind: "administrator", email: process.env.NEXT_PUBLIC_DEMO_ADMIN_EMAIL ?? "admin@company.test", password: process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD ?? "admin-dev-password-1" },
+  { kind: "mailUser", email: process.env.NEXT_PUBLIC_DEMO_USER_EMAIL ?? "user1@company.test", password: process.env.NEXT_PUBLIC_DEMO_USER_PASSWORD ?? "e2e-tenantb-pass1" },
+] as const;
+
+function Field({
+  label, error, children,
+}: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-medium text-foreground">{label}</span>
+      {children}
+      {error && <span className="mt-1 block text-xs font-medium text-danger">{error}</span>}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const qc = useQueryClient();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [quickBusy, setQuickBusy] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError("");
+  // Real readiness signal from the platform, not a decorative badge.
+  const health = useQuery({
+    queryKey: ["health"],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/health/ready`, { cache: "no-store" });
+      return (await res.json()) as { status: string; checks: Record<string, string> };
+    },
+    retry: false,
+    refetchInterval: 30_000,
+  });
+  const healthy = health.data?.status === "ok";
 
-    const parsed = schema.safeParse({ email, password });
-    if (!parsed.success) {
-      const next: typeof errors = {};
-      for (const issue of parsed.error.issues) {
-        next[issue.path[0] as "email" | "password"] = issue.message;
-      }
-      setErrors(next);
-      return;
-    }
-
-    setErrors({});
-    setBusy(true);
-
+  async function authenticate(credentials: { email: string; password: string }, quick?: string) {
+    setFormError(""); setBusy(!quick); setQuickBusy(quick ?? null);
     try {
-      await api.post("/api/v1/auth/login", parsed.data);
+      await api.post("/api/v1/auth/login", { email: credentials.email, password: credentials.password });
       await qc.invalidateQueries();
       router.replace("/mail/inbox");
     } catch (err) {
       setFormError(
-        err instanceof ApiError && err.status === 401
-          ? "Invalid email or password."
-          : err instanceof ApiError && err.status === 429
-            ? "Too many attempts. Try again in a few minutes."
-            : "Could not sign in. Check that the server is running.",
+        err instanceof ApiError && err.status === 401 ? t("invalidCredentials")
+          : err instanceof ApiError && err.status === 429 ? t("tooManyAttempts")
+          : err instanceof ApiError && err.code === "USER_DISABLED" ? "This account is disabled. Contact your administrator."
+          : err instanceof ApiError ? `${err.message} (${err.code})`
+          : t("serverUnavailable"),
       );
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); setQuickBusy(null); }
   }
 
-  return (
-    <main className="newsprint-texture min-h-screen bg-[#f9f9f7] px-4 py-6 lg:px-6">
-      <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-screen-xl gap-0 border-2 border-[#111111] lg:grid-cols-12">
-        <section className="border-b border-[#111111] p-6 lg:col-span-7 lg:border-b-0 lg:border-r">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Issue 01</p>
-          <h1 className="mt-4 font-serif text-[clamp(3.5rem,10vw,8rem)] leading-[0.9] tracking-tighter text-[#111111]">
-            Secure entry for the QazEra edition.
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-[#111111] font-body text-justify">
-            Sign in to reach mail, security, and administration from a single paper-like control
-            surface. The page is intentionally direct: form on the right, editorial context on the
-            left.
-          </p>
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = schema.safeParse({ email, password });
+    if (!parsed.success) { const next: typeof errors = {}; for (const issue of parsed.error.issues) next[issue.path[0] as "email" | "password"] = issue.message; setErrors(next); return; }
+    setErrors({}); await authenticate(parsed.data);
+  }
 
-          <div className="mt-8 grid gap-0 border border-[#111111] md:grid-cols-3">
+  const inputCls =
+    "h-9 w-full rounded-[7px] border border-border-strong bg-surface-elevated px-3 text-[13px] text-foreground outline-none transition-[border-color,box-shadow] duration-100 placeholder:text-faint focus:border-primary focus:ring-2 focus:ring-primary/15";
+
+  return (
+    <main className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_460px]">
+      {/* Context panel: identity + security posture. Hidden below lg. */}
+      <section className="relative hidden flex-col justify-between border-r border-border bg-surface p-10 lg:flex">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-graphite text-sm font-semibold text-graphite-foreground">Q</span>
+          <div>
+            <p className="text-sm font-semibold leading-4 tracking-tight">QazEra</p>
+            <p className="mt-0.5 text-[11px] leading-3 text-muted-foreground">Corporate Communication Platform</p>
+          </div>
+        </div>
+
+        <div className="max-w-md">
+          <p className="qazera-label">Internal system</p>
+          <h1 className="mt-3 text-[22px] font-semibold leading-8 tracking-[-.01em]">
+            Mail, internal messaging and administration for your organization.
+          </h1>
+          <div className="mt-8 space-y-4 border-t border-border pt-6">
             {[
-              "Encrypted sessions",
-              "Sharp audit trails",
-              "Role-based access",
-            ].map((item, index) => (
-              <div
-                key={item}
-                className={`border-b border-[#111111] p-4 ${index < 2 ? "md:border-r" : ""} md:border-b-0`}
-              >
-                <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">{item}</p>
+              { icon: "shield-check", title: t("featureAccess"), text: "Sessions are cookie-bound, rate-limited and revocable." },
+              { icon: "scroll-text", title: t("featureAudit"), text: "Administrative and authentication events are recorded in the audit log." },
+              { icon: "mail", title: t("featureUnified"), text: "Mail, contacts, departments and announcements in one workspace." },
+            ].map((f) => (
+              <div key={f.icon} className="flex gap-3">
+                <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border border-border bg-surface-elevated text-muted-foreground">
+                  <Icon name={f.icon} className="h-3.5 w-3.5" />
+                </span>
+                <div>
+                  <p className="text-[13px] font-medium">{f.title}</p>
+                  <p className="mt-0.5 text-xs leading-4.5 text-muted-foreground">{f.text}</p>
+                </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section className="bg-[#e5e5e0] p-6 lg:col-span-5">
-          <div className="border border-[#111111] bg-[#f9f9f7] p-5 lg:p-6">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Login</p>
-                <h2 className="mt-2 font-serif text-4xl tracking-tight text-[#111111]">
-                  Open your session
-                </h2>
-              </div>
-              <Link href="/" className="font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
-                Home
-              </Link>
-            </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <span className={cx("h-1.5 w-1.5 rounded-full", health.isLoading ? "bg-border-strong" : healthy ? "bg-success" : "bg-warning")} />
+            {health.isLoading ? "Checking system status…" : healthy ? "All systems operational" : "Degraded — some services unavailable"}
+          </span>
+          <span>© {new Date().getFullYear()} QazEra</span>
+        </div>
+      </section>
 
-            <form className="mt-6 space-y-4" onSubmit={submit}>
-              <Input
-                label="Email"
+      {/* Sign-in panel */}
+      <section className="flex flex-col px-6 py-8 sm:px-12">
+        <div className="flex items-center justify-between lg:justify-end">
+          <div className="flex items-center gap-2.5 lg:hidden">
+            <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-graphite text-sm font-semibold text-graphite-foreground">Q</span>
+            <p className="text-sm font-semibold tracking-tight">QazEra</p>
+          </div>
+          <LocaleSwitcher />
+        </div>
+
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
+          <h2 className="text-lg font-semibold tracking-tight">{t("signInTitle")}</h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">{t("signInHint")}</p>
+
+          <form className="mt-7 space-y-4" onSubmit={submit} noValidate>
+            <Field label={t("email")} error={errors.email}>
+              <input
                 type="email"
                 autoComplete="email"
-                placeholder="you@company.test"
+                autoFocus
+                placeholder="name@company.kz"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                error={errors.email}
-                autoFocus
+                className={cx(inputCls, errors.email && "border-danger focus:border-danger focus:ring-danger/15")}
               />
-              <Input
-                label="Password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={errors.password}
-              />
-              {formError && <p className="text-sm font-medium text-[#cc0000] font-sans">{formError}</p>}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button type="submit" disabled={busy}>
-                  {busy ? <Spinner className="border-white border-t-transparent" /> : "Sign in"}
-                </Button>
-                <Link
-                  href="/"
-                  className="font-mono text-xs uppercase tracking-[0.3em] text-[#111111] underline decoration-[#cc0000] decoration-2 underline-offset-4"
+            </Field>
+            <Field label={t("password")} error={errors.password}>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={cx(inputCls, "pr-10", errors.password && "border-danger focus:border-danger focus:ring-danger/15")}
+                />
+                <button
+                  type="button"
+                  className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-[6px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  Return home
-                </Link>
+                  <Icon name={showPassword ? "eye-off" : "eye"} className="h-3.5 w-3.5" />
+                </button>
               </div>
-            </form>
+            </Field>
+
+            {formError && (
+              <div className="flex items-start gap-2 rounded-[7px] border border-danger/25 bg-danger/5 px-3 py-2.5 text-[13px] leading-5 text-danger" role="alert">
+                <Icon name="alert-triangle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {formError}
+              </div>
+            )}
+
+            <Button type="submit" disabled={busy || !!quickBusy} className="h-9 w-full">
+              {busy ? <><Spinner className="h-3.5 w-3.5 border-white" /> {t("signingIn")}…</> : t("signIn")}
+            </Button>
+          </form>
+
+          <div className="mt-8">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-medium uppercase tracking-[.05em] text-faint">{t("quickAccess")}</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <div className="mt-3 grid gap-2">
+              {QUICK_ACCOUNTS.map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  disabled={!!quickBusy || busy}
+                  onClick={() => authenticate(account, account.email)}
+                  className="flex items-center gap-3 rounded-[8px] border border-border bg-surface-elevated px-3 py-2 text-left transition-colors hover:border-border-strong hover:bg-background disabled:opacity-60"
+                >
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-background text-muted-foreground">
+                    <Icon name={account.kind === "administrator" ? "shield" : "user"} className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium leading-4">{t(account.kind)}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{account.email}</span>
+                  </span>
+                  {quickBusy === account.email ? <Spinner className="h-3.5 w-3.5" /> : <Icon name="chevron-right" className="h-3.5 w-3.5 text-faint" />}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-faint">{t("quickHint")}</p>
           </div>
-        </section>
-      </div>
+        </div>
+
+        <p className="text-center text-xs text-faint">{t("protected")}</p>
+      </section>
     </main>
   );
 }

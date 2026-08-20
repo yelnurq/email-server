@@ -1,6 +1,3 @@
-// Package auth implements password credentials, sessions and the request
-// authentication middleware. Sessions are opaque bearer tokens whose SHA-256
-// hash is stored in PostgreSQL; raw tokens are never persisted or logged.
 package auth
 
 import (
@@ -9,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -62,6 +60,7 @@ func (id *Identity) HasPermission(perm string) bool {
 // Service owns session persistence.
 type Service struct {
 	Pool *pgxpool.Pool
+	Log  *slog.Logger
 }
 
 func hashToken(token string) []byte {
@@ -76,10 +75,11 @@ func (s *Service) CreateSession(ctx context.Context, userID, ip, userAgent strin
 		return "", err
 	}
 	token = base64.RawURLEncoding.EncodeToString(raw)
+	expiresAt := time.Now().UTC().Add(SessionTTL)
 	_, err = s.Pool.Exec(ctx, `
 		INSERT INTO sessions (user_id, token_hash, expires_at, ip, user_agent)
 		VALUES ($1, $2, $3, $4, $5)`,
-		userID, hashToken(token), time.Now().UTC().Add(SessionTTL), ip, userAgent)
+		userID, hashToken(token), expiresAt, ip, userAgent)
 	if err != nil {
 		return "", err
 	}
@@ -108,9 +108,15 @@ func (s *Service) Resolve(ctx context.Context, token string) (*Identity, error) 
 		hashToken(token)).
 		Scan(&id.SessionID, &id.UserID, &id.TenantID, &orgID, &id.Email, &id.DisplayName)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if s.Log != nil {
+			s.Log.Warn("session not found", slog.String("token_hash", base64.RawURLEncoding.EncodeToString(hashToken(token)[:8])))
+		}
 		return nil, ErrNoSession
 	}
 	if err != nil {
+		if s.Log != nil {
+			s.Log.Error("session query failed", slog.String("error", err.Error()))
+		}
 		return nil, err
 	}
 	if orgID != nil {
@@ -123,6 +129,9 @@ func (s *Service) Resolve(ctx context.Context, token string) (*Identity, error) 
 		JOIN role_permissions rp ON rp.role_code = ur.role_code
 		WHERE ur.user_id = $1`, id.UserID)
 	if err != nil {
+		if s.Log != nil {
+			s.Log.Error("roles query failed", slog.String("userID", id.UserID), slog.String("error", err.Error()))
+		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -131,6 +140,9 @@ func (s *Service) Resolve(ctx context.Context, token string) (*Identity, error) 
 		var role, scopeType, perm string
 		var scopeID *string
 		if err := rows.Scan(&role, &scopeType, &scopeID, &perm); err != nil {
+			if s.Log != nil {
+				s.Log.Error("role scan failed", slog.String("userID", id.UserID), slog.String("error", err.Error()))
+			}
 			return nil, err
 		}
 		id.Permissions[perm] = true
@@ -147,7 +159,13 @@ func (s *Service) Resolve(ctx context.Context, token string) (*Identity, error) 
 			id.Roles = append(id.Roles, grant)
 		}
 	}
-	return id, rows.Err()
+	if err := rows.Err(); err != nil {
+		if s.Log != nil {
+			s.Log.Error("roles iteration failed", slog.String("userID", id.UserID), slog.String("error", err.Error()))
+		}
+		return nil, err
+	}
+	return id, nil
 }
 
 // RevokeSession invalidates one session by its id.

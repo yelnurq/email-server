@@ -17,8 +17,9 @@ import (
 
 // Stream configuration for the mail plane.
 const (
-	StreamName    = "EMAIL"
-	SubjectPrefix = "email."
+	StreamName                 = "EMAIL"
+	SubjectPrefix              = "email."
+	CommunicationSubjectPrefix = "communication."
 
 	SubjectAccepted       = "email.accepted"
 	SubjectDeliveredLocal = "email.delivered_local"
@@ -53,7 +54,7 @@ func EnsureStream(nc *nats.Conn) error {
 	}
 	cfg := &nats.StreamConfig{
 		Name:      StreamName,
-		Subjects:  []string{SubjectPrefix + ">"},
+		Subjects:  []string{SubjectPrefix + ">", CommunicationSubjectPrefix + ">"},
 		Retention: nats.LimitsPolicy,
 		Storage:   nats.FileStorage,
 		MaxAge:    7 * 24 * time.Hour,

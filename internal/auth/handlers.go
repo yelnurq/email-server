@@ -33,6 +33,8 @@ type userResponse struct {
 	DisplayName    string      `json:"display_name"`
 	TenantID       string      `json:"tenant_id"`
 	OrganizationID string      `json:"organization_id,omitempty"`
+	DepartmentID   string      `json:"department_id,omitempty"`
+	DepartmentName string      `json:"department_name,omitempty"`
 	Roles          []RoleGrant `json:"roles"`
 	Permissions    []string    `json:"permissions"`
 }
@@ -84,6 +86,8 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.Log.Debug("login attempt", slog.String("email", req.Email), slog.String("ip", ip))
+
 	var userID, tenantID, status, passwordHash string
 	err := h.Service.Pool.QueryRow(r.Context(), `
 		SELECT u.id, u.tenant_id, u.status, c.password_hash
@@ -93,17 +97,19 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		Scan(&userID, &tenantID, &status, &passwordHash)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
+		h.Log.Debug("user not found", slog.String("email", req.Email))
 		// Equalize timing between unknown-user and wrong-password paths.
 		_ = VerifyPassword(req.Password, dummyHash)
 		httpx.Error(w, r, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 		return
 	case err != nil:
-		h.Log.Error("login query failed", slog.String("error", err.Error()))
+		h.Log.Error("login query failed", slog.String("email", req.Email), slog.String("error", err.Error()))
 		httpx.Internal(w, r)
 		return
 	}
 
 	if err := VerifyPassword(req.Password, passwordHash); err != nil {
+		h.Log.Debug("password verify failed", slog.String("email", req.Email))
 		h.Audit.Record(r.Context(), audit.Entry{
 			TenantID: tenantID, Action: "auth.login_failed",
 			ResourceType: "user", ResourceID: userID, IP: ip,
@@ -112,22 +118,26 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if status != "active" {
+		h.Log.Debug("user disabled", slog.String("email", req.Email), slog.String("status", status))
 		httpx.Error(w, r, http.StatusForbidden, "USER_DISABLED", "This account is disabled")
 		return
 	}
 
 	token, err := h.Service.CreateSession(r.Context(), userID, ip, r.UserAgent())
 	if err != nil {
-		h.Log.Error("session create failed", slog.String("error", err.Error()))
+		h.Log.Error("session create failed", slog.String("userID", userID), slog.String("error", err.Error()))
 		httpx.Internal(w, r)
 		return
 	}
+	h.Log.Debug("session created", slog.String("userID", userID), slog.String("token_prefix", token[:10]))
+	
 	id, err := h.Service.Resolve(r.Context(), token)
 	if err != nil {
-		h.Log.Error("session resolve failed", slog.String("error", err.Error()))
+		h.Log.Error("session resolve failed", slog.String("userID", userID), slog.String("error", err.Error()))
 		httpx.Internal(w, r)
 		return
 	}
+	h.Log.Debug("session resolved", slog.String("userID", userID), slog.String("email", id.Email))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
@@ -176,7 +186,16 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 // Me returns the current authenticated identity.
 func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 	id := IdentityFrom(r.Context())
-	httpx.JSON(w, http.StatusOK, identityResponse(id))
+	response := identityResponse(id)
+	if err := h.Service.Pool.QueryRow(r.Context(), `
+		SELECT COALESCE(d.id::text, ''), COALESCE(d.name, '')
+		FROM users u LEFT JOIN departments d ON d.id = u.department_id
+		WHERE u.id = $1 AND u.tenant_id = $2`, id.UserID, id.TenantID).
+		Scan(&response.DepartmentID, &response.DepartmentName); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, response)
 }
 
 type changePasswordRequest struct {

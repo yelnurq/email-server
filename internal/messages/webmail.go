@@ -127,6 +127,16 @@ func (h *WebmailHandlers) List(w http.ResponseWriter, r *http.Request) {
 		            OR m.from_address::text ILIKE $4)`
 		args = append(args, q, "%"+q+"%")
 	}
+	// Optional list filters used by the workspace toolbar.
+	if r.URL.Query().Get("unread") == "1" {
+		query += ` AND NOT mm.is_read`
+	}
+	if r.URL.Query().Get("starred") == "1" {
+		query += ` AND mm.is_starred`
+	}
+	if r.URL.Query().Get("attachments") == "1" {
+		query += ` AND m.has_attachments`
+	}
 	query += ` ORDER BY mm.created_at DESC LIMIT ` + strconv.Itoa(limit) + ` OFFSET ` + strconv.Itoa(offset)
 
 	rows, err := h.Svc.Pool.Query(r.Context(), query, args...)

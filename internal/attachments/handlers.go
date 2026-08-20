@@ -145,6 +145,12 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 		      SELECT 1 FROM mailbox_messages mm
 		      JOIN mailboxes mb ON mb.id = mm.mailbox_id
 		      WHERE mm.message_id = a.message_id AND mb.user_id = $3
+		    ) OR EXISTS (
+		      SELECT 1 FROM chat_messages cm
+		      JOIN chat_conversations cc ON cc.id = cm.conversation_id
+		      JOIN chat_conversation_members member ON member.conversation_id = cc.id
+		      WHERE cm.id = a.chat_message_id AND member.user_id = $3
+		        AND cc.tenant_id = $2
 		    )
 		  )`,
 		publicID, id.TenantID, id.UserID).

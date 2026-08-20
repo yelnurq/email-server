@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EmailSaaS - Security Incident Details</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-on-surface": "#ecf1ff",
+                      "on-tertiary-container": "#ffede6",
+                      "on-secondary-fixed": "#191c1e",
+                      "on-tertiary-fixed": "#360f00",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#e0e3e5",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-error": "#ffffff",
+                      "on-secondary-container": "#626567",
+                      "secondary-fixed": "#e0e3e5",
+                      "primary-container": "#2563eb",
+                      "on-background": "#111c2d",
+                      "primary-fixed": "#dbe1ff",
+                      "on-primary-fixed": "#00174b",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "secondary": "#5c5f61",
+                      "tertiary": "#943700",
+                      "surface-container-high": "#dee8ff",
+                      "surface-bright": "#f9f9ff",
+                      "surface": "#f9f9ff",
+                      "secondary-fixed-dim": "#c4c7c9",
+                      "outline-variant": "#c3c6d7",
+                      "surface-dim": "#cfdaf2",
+                      "on-tertiary": "#ffffff",
+                      "primary": "#004ac6",
+                      "error": "#ba1a1a",
+                      "background": "#f9f9ff",
+                      "on-secondary": "#ffffff",
+                      "inverse-surface": "#263143",
+                      "tertiary-fixed": "#ffdbcd",
+                      "surface-tint": "#0053db",
+                      "on-surface-variant": "#434655",
+                      "inverse-primary": "#b4c5ff",
+                      "tertiary-container": "#bc4800",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#f0f3ff",
+                      "on-secondary-fixed-variant": "#444749",
+                      "outline": "#737686",
+                      "surface-container-highest": "#d8e3fb",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#111c2d",
+                      "surface-container": "#e7eeff",
+                      "on-primary-container": "#eeefff",
+                      "surface-variant": "#d8e3fb"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-lg": "32px",
+                      "stack-md": "16px",
+                      "gutter": "16px",
+                      "unit": "4px",
+                      "container-padding-desktop": "24px",
+                      "container-padding-mobile": "16px",
+                      "stack-sm": "8px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "code-sm": [
+                              "jetbrainsMono"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "headline-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "code-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-sm": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="h-full flex bg-background text-on-surface font-body-md overflow-hidden">
+<!-- Side Navigation -->
+<aside class="fixed left-0 top-0 h-screen w-[260px] bg-surface-container-low border-r border-outline-variant flex flex-col z-20 transition-transform duration-300 md:translate-x-0 -translate-x-full">
+<div class="h-14 flex items-center px-container-padding-desktop border-b border-outline-variant">
+<span class="material-symbols-outlined text-primary mr-2" style="font-variation-settings: 'FILL' 1;">mark_email_read</span>
+<div class="font-headline-md text-headline-md font-bold text-primary">EmailSaaS</div>
+</div>
+<nav class="flex flex-col h-full p-stack-md overflow-y-auto gap-unit">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">inbox</span>
+<span class="font-body-md text-body-md">Inbox</span>
+</a>
+<div class="my-2 border-t border-outline-variant"></div>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">mark_email_read</span>
+<span class="font-body-md text-body-md">Deliverability</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">verified_user</span>
+<span class="font-body-md text-body-md">Reputation</span>
+</a>
+<div class="my-2 border-t border-outline-variant"></div>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">security</span>
+<span class="font-body-md text-body-md">Security Center</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container text-on-secondary-container font-medium rounded-lg opacity-90 transition-opacity" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">gpp_bad</span>
+<span class="font-body-md text-body-md">Threats</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">report_problem</span>
+<span class="font-body-md text-body-md">Abuse</span>
+</a>
+</nav>
+<div class="p-stack-md mt-auto border-t border-outline-variant">
+<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-surface-container-high">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="A small, professional 3D rendered avatar of a corporate user profile, geometric, light mode, clean white and blue aesthetic, soft lighting, 50x50 resolution." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAy7NNgyJeVrCq5PAmpgMmtPIDNA64Y-Rml_V54NMD6Nm1tqkLNg_z8rIoy2ekWBIO5X921UnmLAJ9jIbPg68O2-GAPKfI9GeOsRwEwOxiuvqy6Hn_4Xi3yPVD-MGhm5Wmb4p2Y50KN-IDbK__qBw2RGYVI2TZBK8vqYnAmBgRRDpHwC8K_q-n_gHwPNHhg9YEYb1ntydsN_BFPuuX5oyP-BaTmbAK7I0Pa4Wfq4SuA7xSq670QvQI"/>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Organization User</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Enterprise Tier</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col md:ml-[260px] h-full overflow-hidden relative">
+<!-- Top App Bar -->
+<header class="h-14 flex items-center justify-between px-container-padding-desktop bg-surface border-b border-outline-variant shrink-0 w-full z-10">
+<div class="flex items-center gap-4">
+<button class="md:hidden text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="hidden md:flex gap-6">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Docs</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors" href="#">Changelog</a>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Scrollable Canvas -->
+<div class="flex-1 overflow-y-auto p-container-padding-mobile md:p-container-padding-desktop bg-surface-container-lowest">
+<!-- Context & Breadcrumbs -->
+<div class="flex items-center gap-2 mb-stack-md">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Threats</a>
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">chevron_right</span>
+<span class="font-body-sm text-body-sm text-on-surface font-medium">Incident #INC-9482A</span>
+</div>
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-stack-md mb-stack-lg border-b border-outline-variant pb-stack-md">
+<div class="flex flex-col gap-unit">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Security Incident Details</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Detected anomalous incoming communication attempting credential harvest.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2 border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                        Export EML
+                    </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">gavel</span>
+                        Block Domain
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter mb-stack-lg">
+<!-- Risk Score Card (Primary Focus) -->
+<div class="md:col-span-4 bg-surface-container-low border border-outline-variant rounded-xl p-stack-md flex flex-col justify-between">
+<div class="flex items-center justify-between mb-stack-md">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Overall Risk Score</span>
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex items-baseline gap-2 mb-unit">
+<span class="font-headline-lg text-[48px] leading-none font-bold text-error">91</span>
+<span class="font-body-lg text-body-lg text-on-surface-variant">/ 100</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-2 mb-stack-md">
+<div class="bg-error h-2 rounded-full" style="width: 91%"></div>
+</div>
+<div class="flex items-center gap-2 mt-auto">
+<span class="px-2 py-1 bg-error-container text-on-error-container rounded font-code-sm text-code-sm font-medium">CRITICAL SEVERITY</span>
+</div>
+</div>
+<!-- Metadata Card -->
+<div class="md:col-span-8 bg-surface-container-low border border-outline-variant rounded-xl p-stack-md">
+<div class="grid grid-cols-2 gap-stack-md h-full">
+<div class="flex flex-col gap-unit">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Category</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">phishing</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Phishing Attempt</span>
+</div>
+</div>
+<div class="flex flex-col gap-unit">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Action Taken</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">policy</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Quarantined</span>
+</div>
+</div>
+<div class="flex flex-col gap-unit">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Timestamp</span>
+<span class="font-code-sm text-code-sm text-on-surface">2023-10-24T14:32:01Z</span>
+</div>
+<div class="flex flex-col gap-unit">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Target</span>
+<span class="font-body-md text-body-md text-on-surface">finance-team@emailsaas.com</span>
+</div>
+</div>
+</div>
+<!-- Detailed Signals (Full Width) -->
+<div class="md:col-span-12 bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">radar</span>
+                            Detection Signals
+                        </h2>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Signal 1 -->
+<div class="p-stack-md flex flex-col md:flex-row gap-stack-md hover:bg-surface-bright transition-colors">
+<div class="md:w-1/4 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">DMARC_FAIL</span>
+</div>
+<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded w-fit font-label-md text-[10px]">WEIGHT: HIGH</span>
+</div>
+<div class="md:w-3/4 flex flex-col gap-2">
+<p class="font-body-sm text-body-sm text-on-surface-variant">The message failed DMARC evaluation. The domain <code class="font-code-sm text-code-sm bg-surface-variant px-1 rounded text-on-surface">secure-update-acct.com</code> published a p=reject policy, but authentication checks (SPF/DKIM) did not align with the header From address.</p>
+</div>
+</div>
+<!-- Signal 2 -->
+<div class="p-stack-md flex flex-col md:flex-row gap-stack-md hover:bg-surface-bright transition-colors">
+<div class="md:w-1/4 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">DOMAIN_IMPERSONATION</span>
+</div>
+<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded w-fit font-label-md text-[10px]">WEIGHT: HIGH</span>
+</div>
+<div class="md:w-3/4 flex flex-col gap-2">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Levenshtein distance analysis detected a high similarity to internal domain <code class="font-code-sm text-code-sm bg-surface-variant px-1 rounded text-on-surface">emailsaas.com</code>. The sending domain uses character substitution (homoglyph attack).</p>
+</div>
+</div>
+<!-- Signal 3 -->
+<div class="p-stack-md flex flex-col md:flex-row gap-stack-md hover:bg-surface-bright transition-colors">
+<div class="md:w-1/4 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">PHISHING_URL</span>
+</div>
+<span class="px-2 py-0.5 bg-tertiary-container text-on-tertiary-container rounded w-fit font-label-md text-[10px]">WEIGHT: MEDIUM</span>
+</div>
+<div class="md:w-3/4 flex flex-col gap-2">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Message body contains obfuscated hyperlinks pointing to known credential-harvesting infrastructure. URL reputation database lookup returned a match for recent active campaigns.</p>
+</div>
+</div>
+<!-- Signal 4 -->
+<div class="p-stack-md flex flex-col md:flex-row gap-stack-md hover:bg-surface-bright transition-colors">
+<div class="md:w-1/4 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">NEW_DOMAIN</span>
+</div>
+<span class="px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded w-fit font-label-md text-[10px]">WEIGHT: LOW</span>
+</div>
+<div class="md:w-3/4 flex flex-col gap-2">
+<p class="font-body-sm text-body-sm text-on-surface-variant">The sending domain was registered within the last 72 hours. Lack of historical volume or established reputation score increases suspiciousness.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Analysis & Mitigation (Left Column) -->
+<div class="md:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">insights</span>
+                            Analysis &amp; Mitigation
+                        </h2>
+</div>
+<div class="p-stack-md flex-1 flex flex-col gap-stack-md">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface mb-unit">Automated Analysis</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                                The threat actor is attempting a targeted spear-phishing campaign against the finance department, utilizing a newly registered look-alike domain to bypass basic sender checks. The payload relies on social engineering, prompting the user to "verify an urgent invoice" via a malicious URL. The automated engine correctly identified the DMARC failure and quarantined the asset before delivery.
+                            </p>
+</div>
+<div class="mt-auto">
+<h3 class="font-label-md text-label-md text-on-surface mb-stack-sm">Recommended Actions</h3>
+<ul class="space-y-2">
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-[18px] mt-0.5">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Block the root domain <code class="font-code-sm text-code-sm">secure-update-acct.com</code> globally across the tenant.</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-[18px] mt-0.5">check_circle</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Run a retro-hunt for any other communications originating from IP subnet <code class="font-code-sm text-code-sm">192.168.x.x</code>.</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Impact Summary (Right Column) -->
+<div class="md:col-span-4 bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+                            Impact Summary
+                        </h2>
+</div>
+<div class="p-stack-md flex-1 flex flex-col justify-center">
+<div class="flex items-center justify-between mb-4 border-b border-outline-variant pb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Targeted Users</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">1</span>
+</div>
+<div class="flex items-center justify-between mb-4 border-b border-outline-variant pb-2">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Delivered</span>
+<span class="font-headline-sm text-headline-sm text-primary">0</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Quarantined</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">1</span>
+</div>
+<div class="mt-stack-lg bg-surface-variant rounded p-stack-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">info</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-xs">Zero exposure. Intervention successful.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

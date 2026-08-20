@@ -54,20 +54,18 @@ export default function WebhooksPage() {
   const eventOptions = ["mail.sent", "mail.delivered", "mail.bounced", "webhook.test"];
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">11. Dispatch</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           Webhooks
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-          Webhooks carry events out of the system like press wires. They are signed, explicit, and
-          observable.
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+          Signed webhook deliveries push mail events to your systems, with per-delivery status and retries.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New webhook</p>
+        <p className="text-base font-semibold text-foreground">New webhook</p>
         <form
           className="mt-4 space-y-4"
           onSubmit={(e) => {
@@ -79,10 +77,10 @@ export default function WebhooksPage() {
             <Input label="Delivery URL" placeholder="https://example.com/webhooks/qazera" value={url} onChange={(e) => setUrl(e.target.value)} />
             <div className="flex flex-wrap gap-2">
               {eventOptions.map((ev) => (
-                <label key={ev} className="flex items-center gap-2 border border-[#111111] bg-[#e5e5e0] px-3 py-2 font-mono text-xs uppercase tracking-[0.18em]">
+                <label key={ev} className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-[#111111]"
+                    className="h-4 w-4 accent-primary"
                     checked={events.includes(ev)}
                     onChange={(e) =>
                       setEvents((prev) =>
@@ -108,19 +106,19 @@ export default function WebhooksPage() {
       {hooks.isSuccess && hooks.data.webhooks.length > 0 && (
         <div className="space-y-4">
           {hooks.data.webhooks.map((h) => (
-            <div key={h.id} className="border border-[#111111] bg-[#f9f9f7]">
-              <div className="flex flex-wrap items-center gap-3 border-b border-[#111111] p-4">
+            <div key={h.id} className="border border-border bg-surface-elevated">
+              <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-xs uppercase tracking-[0.3em]">{h.url}</p>
-                  <p className="mt-1 text-xs text-[#525252] font-mono">{h.events.join(", ")}</p>
+                  <p className="truncate font-mono text-xs">{h.url}</p>
+                  <p className="mt-1 text-xs text-muted-foreground font-mono">{h.events.join(", ")}</p>
                 </div>
-                <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
+                <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {h.status}
                 </span>
                 <Button variant="ghost" onClick={() => remove.mutate(h.id)}>Remove</Button>
               </div>
               <div className="p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Deliveries</p>
+                <p className="text-base font-semibold text-foreground">Deliveries</p>
                 <WebhookDeliveries webhookId={h.id} />
               </div>
             </div>
@@ -140,14 +138,14 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
 
   if (deliveries.isLoading) return <PageLoader label="Loading deliveries" />;
   if (deliveries.isSuccess && deliveries.data.deliveries.length === 0) {
-    return <p className="mt-3 text-sm text-[#525252] font-body">No deliveries yet.</p>;
+    return <p className="mt-3 text-sm text-muted-foreground font-body">No deliveries yet.</p>;
   }
 
   return (
-    <div className="mt-3 overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+    <div className="mt-3 overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-[#111111] text-left font-mono uppercase tracking-[0.3em] text-[#525252]">
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th className="px-3 py-2 font-medium">Event</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium">Attempts</th>
@@ -155,18 +153,18 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
             <th className="px-3 py-2 font-medium">Created</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#111111]">
+        <tbody className="divide-y divide-border">
           {deliveries.data?.deliveries.map((d) => (
             <tr key={d.id}>
               <td className="px-3 py-2 font-mono">{d.event_type}</td>
               <td className="px-3 py-2">
-                <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.2em]">
+                <span className="border border-border bg-surface px-2 py-1 font-mono text-[10px]">
                   {d.status}
                 </span>
               </td>
               <td className="px-3 py-2">{d.attempts}</td>
-              <td className="px-3 py-2 text-[#525252]">{d.last_result}</td>
-              <td className="px-3 py-2 text-[#525252]">{formatDate(d.created_at)}</td>
+              <td className="px-3 py-2 text-muted-foreground">{d.last_result}</td>
+              <td className="px-3 py-2 text-muted-foreground">{formatDate(d.created_at)}</td>
             </tr>
           ))}
         </tbody>

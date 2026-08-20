@@ -48,20 +48,19 @@ export default function SmtpPage() {
   });
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">09. Transport</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           SMTP Credentials
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
           SMTP credentials are the delivery press credentials. They allow automated mail systems to
           submit on behalf of a mailbox.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New credential</p>
+        <p className="text-base font-semibold text-foreground">New credential</p>
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -70,13 +69,13 @@ export default function SmtpPage() {
           }}
         >
           <label className="block min-w-72 flex-1">
-            <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+            <span className="mb-2 block text-xs font-medium text-muted-foreground">
               Mailbox
             </span>
             <select
               value={mailboxId}
               onChange={(e) => setMailboxId(e.target.value)}
-              className="w-full border-b-2 border-[#111111] bg-transparent px-3 py-2 font-mono text-sm text-[#111111] outline-none"
+              className="w-full border-b-2 border-border bg-transparent px-3 py-2 font-mono text-sm text-foreground outline-none"
             >
               {(mailboxes.data?.mailboxes ?? []).map((m) => (
                 <option key={m.id} value={m.id}>{m.address}</option>
@@ -90,12 +89,12 @@ export default function SmtpPage() {
       </section>
 
       {created && (
-        <section className="qazera-panel border-[#cc0000] bg-[#f9f9f7] p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Secret shown once</p>
+        <section className="qazera-panel border-danger bg-surface-elevated p-6">
+          <p className="text-base font-semibold text-foreground">Secret shown once</p>
           <dl className="mt-4 space-y-2 font-mono text-xs">
-            <div className="flex gap-2"><dt className="w-20 text-[#525252]">username</dt><dd>{created.username}</dd></div>
-            <div className="flex gap-2"><dt className="w-20 text-[#525252]">password</dt><dd>{created.password}</dd></div>
-            <div className="flex gap-2"><dt className="w-20 text-[#525252]">mailbox</dt><dd>{created.mailbox}</dd></div>
+            <div className="flex gap-2"><dt className="w-20 text-muted-foreground">username</dt><dd>{created.username}</dd></div>
+            <div className="flex gap-2"><dt className="w-20 text-muted-foreground">password</dt><dd>{created.password}</dd></div>
+            <div className="flex gap-2"><dt className="w-20 text-muted-foreground">mailbox</dt><dd>{created.mailbox}</dd></div>
           </dl>
           <div className="mt-4">
             <Button variant="secondary" onClick={() => setCreated(null)}>Done</Button>
@@ -108,10 +107,10 @@ export default function SmtpPage() {
         <EmptyState title="No SMTP credentials yet" />
       )}
       {creds.isSuccess && creds.data.creds.length > 0 && (
-        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+        <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+              <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Username</th>
                 <th className="px-4 py-3 font-medium">Mailbox</th>
                 <th className="px-4 py-3 font-medium">Last used</th>
@@ -119,14 +118,14 @@ export default function SmtpPage() {
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#111111]">
+            <tbody className="divide-y divide-border">
               {creds.data.creds.map((c) => (
                 <tr key={c.id}>
                   <td className="px-4 py-3 font-mono text-xs">{c.username}</td>
                   <td className="px-4 py-3">{c.mailbox_address}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{c.last_used_at || "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{c.last_used_at || "—"}</td>
                   <td className="px-4 py-3">
-                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">{c.status}</span>
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{c.status}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" onClick={() => revoke.mutate(c.id)}>Revoke</Button>

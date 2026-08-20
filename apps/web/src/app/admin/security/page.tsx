@@ -85,20 +85,18 @@ export default function SecurityPage() {
   const resolved = (quarantine.data?.quarantine ?? []).filter((q) => q.status !== "pending");
 
   return (
-    <div className="mx-auto max-w-screen-xl space-y-6">
-      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">06. Security</p>
-        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+    <div className="space-y-6">
+      <section className="mb-8">
+        <h1 className="page-title">
           Security Center
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
-          Quarantine is the newsroom gatekeeper. It holds risky mail outside the inbox until a
-          human authorizes release or deletion.
+        <p className="mt-2 max-w-3xl text-sm leading-5 text-muted-foreground">
+          Risky mail is held in quarantine until an administrator releases or deletes it. Sender blocks stop known-bad addresses and domains at the door.
         </p>
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">
+        <p className="text-base font-semibold text-foreground">
           Quarantine ({pending.length} pending)
         </p>
         {quarantine.isLoading && <PageLoader label="Loading quarantine" />}
@@ -106,10 +104,10 @@ export default function SecurityPage() {
           <EmptyState title="Quarantine is empty" hint="Nothing is being held right now." />
         )}
         {pending.length > 0 && (
-          <div className="mt-4 overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
+          <div className="mt-4 overflow-x-auto rounded-[10px] border border-border bg-surface-elevated">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                <tr className="border-b border-border text-left text-xs">
                   <th className="px-4 py-3 font-medium">From</th>
                   <th className="px-4 py-3 font-medium">Subject</th>
                   <th className="px-4 py-3 font-medium">To</th>
@@ -119,19 +117,19 @@ export default function SecurityPage() {
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#111111]">
+              <tbody className="divide-y divide-border">
                 {pending.map((q) => (
                   <tr key={q.id}>
                     <td className="px-4 py-3 font-semibold">{q.from}</td>
                     <td className="max-w-56 truncate px-4 py-3">{q.subject}</td>
-                    <td className="px-4 py-3 text-[#525252]">{q.recipient_address}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{q.recipient_address}</td>
                     <td className="px-4 py-3">
-                      <span className="border border-[#111111] bg-[#cc0000] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em] text-white">
+                      <span className="rounded-full bg-danger px-2.5 py-1 text-xs font-medium text-white">
                         {q.risk_score}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#525252]">{q.signals.join(", ")}</td>
-                    <td className="px-4 py-3 text-xs text-[#525252]">{formatDate(q.created_at)}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{q.signals.join(", ")}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(q.created_at)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <Button variant="ghost" onClick={() => act.mutate({ id: q.id, action: "release" })}>
                         Release
@@ -150,14 +148,14 @@ export default function SecurityPage() {
           </div>
         )}
         {resolved.length > 0 && (
-          <p className="mt-3 text-xs font-mono uppercase tracking-[0.3em] text-[#525252]">
+          <p className="mt-3 text-xs font-mono text-muted-foreground">
             {resolved.length} resolved item(s) in history.
           </p>
         )}
       </section>
 
       <section className="qazera-panel p-6">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Sender blocks</p>
+        <p className="text-base font-semibold text-foreground">Sender blocks</p>
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -182,20 +180,20 @@ export default function SecurityPage() {
         </form>
 
         {blocks.isSuccess && blocks.data.blocks.length === 0 && (
-          <p className="mt-4 text-sm text-[#525252] font-body">No blocked senders.</p>
+          <p className="mt-4 text-sm text-muted-foreground font-body">No blocked senders.</p>
         )}
         {blocks.isSuccess && blocks.data.blocks.length > 0 && (
           <ul className="mt-4 space-y-2">
             {blocks.data.blocks.map((b) => (
               <li
                 key={b.id}
-                className="flex flex-wrap items-center gap-3 border border-[#111111] bg-[#f9f9f7] px-4 py-3 text-sm"
+                className="flex flex-wrap items-center gap-3 border border-border bg-surface-elevated px-4 py-3 text-sm"
               >
-                <span className="font-mono text-xs uppercase tracking-[0.3em]">{b.pattern}</span>
-                <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
+                <span className="font-mono text-xs">{b.pattern}</span>
+                <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {b.kind}
                 </span>
-                {b.reason && <span className="text-xs text-[#525252]">{b.reason}</span>}
+                {b.reason && <span className="text-xs text-muted-foreground">{b.reason}</span>}
                 <Button variant="ghost" className="ml-auto" onClick={() => removeBlock.mutate(b.id)}>
                   Unblock
                 </Button>
