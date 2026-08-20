@@ -122,8 +122,10 @@ func (h *WebmailHandlers) List(w http.ResponseWriter, r *http.Request) {
 		WHERE mm.mailbox_id = $1 AND f.type = $2`
 	args := []any{mb.ID, folderType}
 	if q != "" {
-		query += ` AND (m.subject ILIKE $3 OR m.from_address::text ILIKE $3 OR m.body_text ILIKE $3)`
-		args = append(args, "%"+q+"%")
+		// Full-text search over subject/body plus a prefix match on sender.
+		query += ` AND (m.search_tsv @@ websearch_to_tsquery('simple', $3)
+		            OR m.from_address::text ILIKE $4)`
+		args = append(args, q, "%"+q+"%")
 	}
 	query += ` ORDER BY mm.created_at DESC LIMIT ` + strconv.Itoa(limit) + ` OFFSET ` + strconv.Itoa(offset)
 
