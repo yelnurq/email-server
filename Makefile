@@ -3,7 +3,7 @@
 # Every target is a thin wrapper over cross-platform commands documented in
 # README.md, so make itself is optional on Windows.
 
-.PHONY: up down logs ps api worker migrate-up migrate-down migrate-status web fmt vet lint test build
+.PHONY: up down logs ps api worker migrate-up migrate-down migrate-status web web-prod fmt vet lint test build
 
 ## Infrastructure (Docker Compose)
 up:
@@ -37,6 +37,12 @@ migrate-status:
 ## Frontend
 web:
 	cd apps/web && npm run dev
+
+# Production build served locally. Pages respond in tens of milliseconds
+# instead of the seconds `next dev` spends compiling routes on demand — use
+# this for demos and for judging real performance.
+web-prod:
+	cd apps/web && npm run build && npm start
 
 ## Quality
 fmt:

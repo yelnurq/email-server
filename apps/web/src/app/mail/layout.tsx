@@ -63,10 +63,12 @@ function MailShell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Deliberately not gated on `me`: both requests carry the same session
+  // cookie, so waiting for /me first only serialises two round trips. If the
+  // session is missing this 401s and is discarded by the redirect below.
   const summary = useQuery({
     queryKey: ["mail", "summary"],
     queryFn: () => api.get<MailSummary>("/api/v1/mail/summary"),
-    enabled: !!me.data,
     refetchInterval: 15_000,
   });
 
