@@ -178,3 +178,70 @@ func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 	id := IdentityFrom(r.Context())
 	httpx.JSON(w, http.StatusOK, identityResponse(id))
 }
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ChangePassword updates the caller's password after verifying the current
+// one, then revokes every other session of the user.
+func (h *Handlers) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	id := IdentityFrom(r.Context())
+	var req changePasswordRequest
+	if err := httpx.Decode(w, r, &req); err != nil {
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	if len(req.NewPassword) < 10 {
+		httpx.Error(w, r, http.StatusBadRequest, "WEAK_PASSWORD", "New password must be at least 10 characters")
+		return
+	}
+
+	var currentHash string
+	if err := h.Service.Pool.QueryRow(r.Context(),
+		`SELECT password_hash FROM user_credentials WHERE user_id = $1`, id.UserID).
+		Scan(&currentHash); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if err := VerifyPassword(req.CurrentPassword, currentHash); err != nil {
+		httpx.Error(w, r, http.StatusForbidden, "WRONG_PASSWORD", "Current password is incorrect")
+		return
+	}
+	newHash, err := HashPassword(req.NewPassword)
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+
+	tx, err := h.Service.Pool.Begin(r.Context())
+	if err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	if _, err := tx.Exec(r.Context(), `
+		UPDATE user_credentials SET password_hash = $1, updated_at = now() WHERE user_id = $2`,
+		newHash, id.UserID); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	// Kill every other session; the current one stays valid.
+	if _, err := tx.Exec(r.Context(), `
+		UPDATE sessions SET revoked_at = now()
+		WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL`,
+		id.UserID, id.SessionID); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		httpx.Internal(w, r)
+		return
+	}
+	h.Audit.Record(r.Context(), audit.Entry{
+		TenantID: id.TenantID, ActorUserID: id.UserID, Action: "auth.password_change",
+		ResourceType: "user", ResourceID: id.UserID, IP: clientIP(r),
+	})
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

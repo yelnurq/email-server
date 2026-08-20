@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -15,6 +16,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/yelnurq/email-server/internal/events"
+	"github.com/yelnurq/email-server/internal/security"
 )
 
 const (
@@ -115,12 +117,14 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	defer tx.Rollback(ctx)
 
 	var size int64
-	var status, fromAddress, msgOrgID string
+	var status, fromAddress, msgOrgID, subject, bodyText string
 	err = tx.QueryRow(ctx, `
-		SELECT size_bytes, status, from_address::text, COALESCE(organization_id::text, '')
+		SELECT size_bytes, status, from_address::text, COALESCE(organization_id::text, ''),
+		       subject, body_text
 		FROM messages
 		WHERE id = $1 AND tenant_id = $2
-		FOR UPDATE`, p.MessageID, p.TenantID).Scan(&size, &status, &fromAddress, &msgOrgID)
+		FOR UPDATE`, p.MessageID, p.TenantID).
+		Scan(&size, &status, &fromAddress, &msgOrgID, &subject, &bodyText)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errPermanent // message vanished; never deliverable
 	}
@@ -160,7 +164,23 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	_ = tx.QueryRow(ctx,
 		`SELECT organization_id FROM mailboxes WHERE address = $1`, fromAddress).Scan(&senderOrgID)
 
+	// Security verdict decides inbox / spam folder / quarantine.
+	verdict, err := security.Evaluate(ctx, tx, p.TenantID, fromAddress, subject, bodyText)
+	if err != nil {
+		return err
+	}
+	targetFolder := "inbox"
+	if verdict.Action == security.ActionSpam {
+		targetFolder = "spam"
+	}
+
 	for _, r := range pending {
+		if verdict.Action == security.ActionQuarantine {
+			if err := w.quarantineRecipient(ctx, tx, p, msgOrgID, r.id, r.address, verdict); err != nil {
+				return err
+			}
+			continue
+		}
 		targets, policyReason, err := w.resolveTargets(ctx, tx, p.TenantID, r.address, senderOrgID)
 		if err != nil {
 			return err
@@ -178,7 +198,7 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		deliveredTo := ""
 		var lastErr string
 		for _, t := range targets {
-			ok, reason, err := w.deliverToMailbox(ctx, tx, t, p.MessageID, size)
+			ok, reason, err := w.deliverToMailbox(ctx, tx, t, p.MessageID, size, targetFolder)
 			if err != nil {
 				return err
 			}
@@ -200,19 +220,22 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	}
 
 	// Final message status from recipient outcomes.
-	var delivered, failed int
+	var delivered, failed, quarantined int
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*) FILTER (WHERE status = 'delivered'),
-		       count(*) FILTER (WHERE status = 'failed')
+		       count(*) FILTER (WHERE status = 'failed'),
+		       count(*) FILTER (WHERE status = 'quarantined')
 		FROM message_recipients WHERE message_id = $1`, p.MessageID).
-		Scan(&delivered, &failed); err != nil {
+		Scan(&delivered, &failed, &quarantined); err != nil {
 		return err
 	}
 	final := "delivered"
 	switch {
+	case delivered == 0 && quarantined > 0:
+		final = "quarantined"
 	case delivered == 0:
 		final = "failed"
-	case failed > 0:
+	case failed > 0 || quarantined > 0:
 		final = "partially_delivered"
 	}
 	if _, err := tx.Exec(ctx, `UPDATE messages SET status = $1 WHERE id = $2`, final, p.MessageID); err != nil {
@@ -304,9 +327,47 @@ func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, addres
 	return targets, "", gRows.Err()
 }
 
-// deliverToMailbox inserts the inbox copy and accounts quota. Returns
-// ok=false with a reason for policy failures (quota).
-func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, messageID string, size int64) (bool, string, error) {
+// quarantineRecipient parks a recipient's copy in the security quarantine
+// instead of delivering it. Idempotent via (message_id, recipient_id).
+func (w *Worker) quarantineRecipient(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, address string, verdict security.Verdict) error {
+	var mailboxID *string
+	var mb string
+	if err := tx.QueryRow(ctx,
+		`SELECT id FROM mailboxes WHERE address = $1`, address).Scan(&mb); err == nil {
+		mailboxID = &mb
+	}
+	signals, _ := json.Marshal(verdict.Signals)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO quarantine_items (tenant_id, message_id, recipient_id, recipient_address,
+		                              mailbox_id, reason, signals, risk_score)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (message_id, recipient_id) DO NOTHING`,
+		p.TenantID, p.MessageID, recipientID, address, mailboxID,
+		strings.Join(verdict.Signals, ", "), signals, verdict.Score); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE message_recipients SET status = 'quarantined', error = 'quarantined by security policy'
+		WHERE id = $1`, recipientID); err != nil {
+		return err
+	}
+	detail, _ := json.Marshal(map[string]any{
+		"recipient_id": recipientID, "score": verdict.Score, "signals": verdict.Signals,
+	})
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO message_events (message_id, type, detail) VALUES ($1, $2, $3)`,
+		p.MessageID, events.SubjectQuarantined, detail); err != nil {
+		return err
+	}
+	return events.Enqueue(ctx, tx, events.SubjectQuarantined, events.DeliveryPayload{
+		MessageID: p.MessageID, PublicID: p.PublicID, TenantID: p.TenantID,
+		OrganizationID: orgID, RecipientID: recipientID, Status: "quarantined",
+	})
+}
+
+// deliverToMailbox inserts the mailbox copy (inbox or spam) and accounts
+// quota. Returns ok=false with a reason for policy failures (quota).
+func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, messageID string, size int64, folderType string) (bool, string, error) {
 	var quota, used int64
 	if err := tx.QueryRow(ctx, `
 		SELECT quota_bytes, used_bytes FROM mailboxes WHERE id = $1 FOR UPDATE`,
@@ -318,8 +379,8 @@ func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, mes
 	}
 	var inboxID string
 	if err := tx.QueryRow(ctx, `
-		SELECT id FROM folders WHERE mailbox_id = $1 AND type = 'inbox'`,
-		mailboxID).Scan(&inboxID); err != nil {
+		SELECT id FROM folders WHERE mailbox_id = $1 AND type = $2`,
+		mailboxID, folderType).Scan(&inboxID); err != nil {
 		return false, "", err
 	}
 	ct, err := tx.Exec(ctx, `

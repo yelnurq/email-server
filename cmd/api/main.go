@@ -22,6 +22,7 @@ import (
 	"github.com/yelnurq/email-server/internal/apikeys"
 	"github.com/yelnurq/email-server/internal/attachments"
 	"github.com/yelnurq/email-server/internal/audit"
+	"github.com/yelnurq/email-server/internal/auditapi"
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/domains"
@@ -32,6 +33,7 @@ import (
 	"github.com/yelnurq/email-server/internal/mailbox"
 	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/organization"
+	"github.com/yelnurq/email-server/internal/security"
 	"github.com/yelnurq/email-server/internal/server"
 	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/tenant"
@@ -139,6 +141,8 @@ func run() error {
 	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	webhookHandlers := &webhooks.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	securityHandlers := &security.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	auditHandlers := &auditapi.Handlers{Pool: pool}
 	emailAPI := &emailapi.Handlers{
 		Pool: pool,
 		Keys: &apikeys.Service{Pool: pool},
@@ -205,6 +209,19 @@ func run() error {
 					hooks.Get("/webhooks/{id}/deliveries", webhookHandlers.Deliveries)
 					hooks.Post("/webhooks/{id}/deliveries/{deliveryID}/retry", webhookHandlers.Retry)
 				})
+
+				admin.Group(func(sec chi.Router) {
+					sec.Use(auth.RequirePermission("security.manage"))
+					sec.Get("/quarantine", securityHandlers.Quarantine)
+					sec.Post("/quarantine/{id}/release", securityHandlers.Release)
+					sec.Post("/quarantine/{id}/delete", securityHandlers.DeleteItem)
+					sec.Get("/security/blocks", securityHandlers.Blocks)
+					sec.Post("/security/blocks", securityHandlers.AddBlock)
+					sec.Delete("/security/blocks/{id}", securityHandlers.RemoveBlock)
+				})
+
+				admin.With(auth.RequirePermission("audit.read")).
+					Get("/audit", auditHandlers.List)
 			})
 
 			// Developer Email API: authenticated by API key, not session.

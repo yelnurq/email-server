@@ -28,6 +28,7 @@ var allowedEvents = map[string]bool{
 	events.SubjectAccepted:       true,
 	events.SubjectDeliveredLocal: true,
 	events.SubjectFailed:         true,
+	events.SubjectQuarantined:    true,
 }
 
 type hookView struct {

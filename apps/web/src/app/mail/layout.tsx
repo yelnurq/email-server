@@ -149,6 +149,20 @@ function MailShell({ children }: { children: React.ReactNode }) {
                 );
               })}
           </nav>
+          <div className="mt-4 border-t border-neutral-100 pt-2 dark:border-neutral-800">
+            <Link
+              href="/mail/settings"
+              onClick={() => setSidebarOpen(false)}
+              className={cx(
+                "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors",
+                pathname === "/mail/settings"
+                  ? "bg-indigo-50 font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                  : "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800",
+              )}
+            >
+              <span aria-hidden>⚙️</span> Settings
+            </Link>
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>

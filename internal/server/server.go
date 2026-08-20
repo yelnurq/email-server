@@ -55,6 +55,7 @@ func New(d Deps) http.Handler {
 			v1.Post("/auth/login", d.Auth.Login)
 			v1.Post("/auth/logout", d.Auth.Logout)
 			v1.With(auth.RequireAuth).Get("/me", d.Auth.Me)
+			v1.With(auth.RequireAuth).Post("/me/password", d.Auth.ChangePassword)
 		}
 		if d.APIRoutes != nil {
 			d.APIRoutes(v1)

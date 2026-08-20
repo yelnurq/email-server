@@ -23,6 +23,7 @@ const (
 	SubjectAccepted       = "email.accepted"
 	SubjectDeliveredLocal = "email.delivered_local"
 	SubjectFailed         = "email.failed"
+	SubjectQuarantined    = "email.quarantined"
 )
 
 // AcceptedPayload is the body of an email.accepted event.

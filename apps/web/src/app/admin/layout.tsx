@@ -16,6 +16,8 @@ const NAV = [
   { href: "/admin/groups", label: "Groups" },
   { href: "/admin/api-keys", label: "API Keys" },
   { href: "/admin/webhooks", label: "Webhooks" },
+  { href: "/admin/security", label: "Security" },
+  { href: "/admin/audit", label: "Audit" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
