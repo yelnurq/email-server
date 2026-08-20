@@ -56,9 +56,39 @@ Living document for security-relevant decisions. Updated 2026-08-20.
 - Audit log entries never contain secrets or tokens.
 - No secrets in the frontend bundle; the only public env var is the API URL.
 
+## API keys & SMTP credentials
+
+- API keys: `mpk_` bearer tokens; only SHA-256 hashes stored, secret shown
+  once at creation; scoped (emails.send / emails.read), revocable, expiry
+  supported, last-used stamped. Non-assignable roles cannot be granted.
+- SMTP credentials: mailbox-scoped, hashed at rest, shown once, revocable.
+- Webhook signing secrets are stored in clear (needed to sign each
+  delivery); encrypt-at-rest is a tracked hardening item.
+
+## Webhooks
+
+- Every delivery is signed: `X-Mailplatform-Signature: v1=` HMAC-SHA256 over
+  `<unix-ts>.<body>`; receivers must verify with constant-time comparison
+  (helper in internal/webhooks). Timestamp header enables replay windows.
+
+## Quarantine & risk baseline
+
+- Deterministic engine only (sender blocks, explicit content markers);
+  bands: 0-40 allow, 41-60 spam folder, 61+ quarantine. Quarantined mail
+  never reaches the mailbox until an analyst releases it; release/delete/
+  block-sender are audited. No AI/ML verdict source.
+
+## Attachments
+
+- 25 MiB cap, content-type sniffing (never filename-trusted), path-stripped
+  filenames, SHA-256 checksums, tenant-keyed storage paths. Downloads are
+  streamed through the API with ownership checks (uploader or holder of a
+  mailbox copy); cross-tenant ids return 404 (E2E-enforced). AV scanning
+  (ClamAV) plugs in at the mail-core phase.
+
 ## Known gaps (tracked)
 
 - API-wide rate limiting beyond login is not implemented yet.
 - Security headers (CSP, X-Frame-Options...) not yet set on the API/frontend.
-- Attachment pipeline (size limits, MIME sniffing, AV scan) not built yet;
-  requirements documented in the master spec and must land with attachments.
+- Webhook secrets and future DKIM keys need encrypt-at-rest before
+  production.

@@ -62,8 +62,10 @@ With infra + API + worker running:
 bash scripts/e2e.sh
 ```
 
-19 checks: full send/receive/reply journey, Sent copies, mailbox and
-cross-tenant isolation, RBAC, session revocation.
+37 checks covering all five user journeys: send/receive/reply, aliases,
+groups, attachments (incl. cross-tenant download denial), Email API with
+idempotency, webhooks with independent HMAC verification, spam/quarantine
+lifecycle, tenant isolation, RBAC and session revocation.
 
 All commands are identical in PowerShell, Git Bash and Linux shells.
 `make up`, `make api`, `make web` etc. are available where `make` exists
@@ -112,10 +114,12 @@ All endpoints under `/api/v1`, unified error envelope
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /me` |
-| Admin | `GET/POST /organizations`, `GET/POST /domains`, `GET/POST /users`, `GET/POST /mailboxes` |
-| Webmail | `GET /mail/summary`, `GET /mail/messages?folder=&q=&limit=&offset=`, `GET/PATCH/DELETE /mail/messages/{id}`, `POST /mail/send` |
+| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /me`, `POST /me/password` |
+| Admin | `GET/POST /organizations`, `/domains`, `/users`, `/mailboxes`; aliases, groups (+`/{id}/members`), `/api-keys`, `/smtp-credentials`, `/webhooks` (+deliveries/retry) |
+| Security | `GET /quarantine`, `POST /quarantine/{id}/release|delete`, `GET/POST/DELETE /security/blocks`, `GET /audit` |
+| Webmail | `GET /mail/summary`, `GET /mail/messages?folder=&q=&limit=&offset=`, `GET/PATCH/DELETE /mail/messages/{id}`, `POST /mail/send`, attachments upload/download |
 | Drafts | `POST /mail/drafts`, `PUT /mail/drafts/{id}`, `POST /mail/drafts/{id}/send` |
+| Email API | `POST /emails` (+`Idempotency-Key`), `POST /emails/batch`, `GET /emails/{id}`, `GET /emails/{id}/events` — API-key auth, see [docs/api/openapi.yaml](docs/api/openapi.yaml) |
 
 Sessions: HttpOnly cookie for the browser, or `Authorization: Bearer <token>`
 from the login response.
