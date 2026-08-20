@@ -35,6 +35,7 @@ import (
 	"github.com/yelnurq/email-server/internal/organization"
 	"github.com/yelnurq/email-server/internal/security"
 	"github.com/yelnurq/email-server/internal/server"
+	"github.com/yelnurq/email-server/internal/smtpcreds"
 	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/tenant"
 	"github.com/yelnurq/email-server/internal/users"
@@ -142,6 +143,7 @@ func run() error {
 	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	webhookHandlers := &webhooks.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	securityHandlers := &security.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	smtpCredHandlers := &smtpcreds.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	auditHandlers := &auditapi.Handlers{Pool: pool}
 	emailAPI := &emailapi.Handlers{
 		Pool: pool,
@@ -198,6 +200,10 @@ func run() error {
 					keys.Get("/api-keys", apikeyHandlers.List)
 					keys.Post("/api-keys", apikeyHandlers.Create)
 					keys.Delete("/api-keys/{id}", apikeyHandlers.Revoke)
+
+					keys.Get("/smtp-credentials", smtpCredHandlers.List)
+					keys.Post("/smtp-credentials", smtpCredHandlers.Create)
+					keys.Delete("/smtp-credentials/{id}", smtpCredHandlers.Revoke)
 				})
 
 				admin.Group(func(hooks chi.Router) {

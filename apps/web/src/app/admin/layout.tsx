@@ -15,6 +15,7 @@ const NAV = [
   { href: "/admin/aliases", label: "Aliases" },
   { href: "/admin/groups", label: "Groups" },
   { href: "/admin/api-keys", label: "API Keys" },
+  { href: "/admin/smtp", label: "SMTP" },
   { href: "/admin/webhooks", label: "Webhooks" },
   { href: "/admin/security", label: "Security" },
   { href: "/admin/audit", label: "Audit" },
