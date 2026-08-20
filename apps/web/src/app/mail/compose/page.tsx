@@ -50,9 +50,9 @@ function ComposeForm() {
   const [savedAt, setSavedAt] = useState<string>("");
   const dirty = useRef(false);
 
-  // Load an existing draft or the message being forwarded.
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       try {
         if (draftParam) {
@@ -78,6 +78,7 @@ function ComposeForm() {
         if (!cancelled) setLoaded(true);
       }
     }
+
     void load();
     return () => {
       cancelled = true;
@@ -108,7 +109,6 @@ function ComposeForm() {
     }
   }, [to, cc, bcc, subject, text, draftId, qc]);
 
-  // Autosave every 5s while there are unsaved changes.
   useEffect(() => {
     const t = setInterval(() => {
       if (dirty.current && (to || subject || text)) void saveDraft();
@@ -151,11 +151,11 @@ function ComposeForm() {
       toast("error", "Wait for attachments to finish uploading");
       return;
     }
+
     const attachmentIds = uploads.filter((u) => u.attachment).map((u) => u.attachment!.id);
     setSending(true);
     try {
       if (draftId && attachmentIds.length === 0) {
-        // Persist latest content, then promote the draft.
         const ok = await saveDraft();
         if (!ok) throw new Error("draft save failed");
         await api.post(`/api/v1/mail/drafts/${draftId}/send`);
@@ -182,7 +182,6 @@ function ComposeForm() {
           ? err.message
           : "Could not send. Draft is preserved.",
       );
-      // Keep content; try to snapshot it as a draft so nothing is lost.
       if (!draftId) void saveDraft();
     } finally {
       setSending(false);
@@ -197,17 +196,21 @@ function ComposeForm() {
     router.back();
   }
 
-  if (!loaded) return <PageLoader />;
+  if (!loaded) return <PageLoader label="Loading composer" />;
 
   return (
-    <div className="mx-auto max-w-3xl p-4">
-      <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
-          <h1 className="text-sm font-semibold">New message</h1>
-          {savedAt && <span className="text-xs text-neutral-400">Draft saved {savedAt}</span>}
+    <div className="mx-auto max-w-5xl p-4 lg:p-6">
+      <div className="qazera-panel overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black bg-[#f2f2f2] px-5 py-4 lg:px-6">
+          <div>
+            <p className="qazera-label text-accent">Compose</p>
+            <h1 className="mt-2 text-2xl font-black uppercase tracking-tight">New message</h1>
+          </div>
+          {savedAt && <span className="qazera-label">Draft saved {savedAt}</span>}
         </div>
-        <div className="space-y-3 p-5">
-          <div className="flex items-end gap-2">
+
+        <div className="space-y-4 p-5 lg:p-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <div className="flex-1">
               <Input
                 label="To"
@@ -221,17 +224,19 @@ function ComposeForm() {
               />
             </div>
             {!showCc && (
-              <Button variant="ghost" onClick={() => setShowCc(true)}>
-                Cc/Bcc
+              <Button variant="secondary" onClick={() => setShowCc(true)}>
+                Cc / Bcc
               </Button>
             )}
           </div>
+
           {showCc && (
-            <>
+            <div className="grid gap-4 lg:grid-cols-2">
               <Input label="Cc" value={cc} onChange={(e) => { setCc(e.target.value); markDirty(); }} />
               <Input label="Bcc" value={bcc} onChange={(e) => { setBcc(e.target.value); markDirty(); }} />
-            </>
+            </div>
           )}
+
           <Input
             label="Subject"
             value={subject}
@@ -240,59 +245,56 @@ function ComposeForm() {
               markDirty();
             }}
           />
+
           <Textarea
-            rows={12}
-            placeholder="Write your message…"
+            rows={14}
+            label="Message"
+            placeholder="Write your message..."
             value={text}
             onChange={(e) => {
               setText(e.target.value);
               markDirty();
             }}
           />
+
           {uploads.length > 0 && (
-            <ul className="space-y-1">
+            <ul className="space-y-3">
               {uploads.map((u) => (
-                <li
-                  key={u.key}
-                  className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs dark:border-neutral-700"
-                >
-                  <span aria-hidden>📎</span>
-                  <span className="truncate">{u.name}</span>
-                  {u.error && <span className="text-red-600">{u.error}</span>}
+                <li key={u.key} className="qazera-panel-muted flex flex-wrap items-center gap-3 p-4">
+                  <span className="qazera-label">{u.name}</span>
+                  {u.error && <span className="text-xs font-bold uppercase tracking-[0.16em] text-accent">{u.error}</span>}
                   {!u.error && !u.attachment && (
-                    <span className="ml-auto flex items-center gap-2 text-neutral-400">
-                      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
-                        <span
-                          className="block h-full bg-indigo-500 transition-all"
-                          style={{ width: `${Math.round(u.progress * 100)}%` }}
-                        />
+                    <span className="ml-auto flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em]">
+                      <span className="h-2 w-28 overflow-hidden border border-black bg-white">
+                        <span className="block h-full bg-accent" style={{ width: `${Math.round(u.progress * 100)}%` }} />
                       </span>
                       {Math.round(u.progress * 100)}%
                     </span>
                   )}
                   {u.attachment && (
-                    <span className="ml-auto text-neutral-400">
+                    <span className="ml-auto text-xs font-bold uppercase tracking-[0.16em]">
                       {formatBytes(u.attachment.size_bytes)}
                     </span>
                   )}
                   <button
-                    className="text-neutral-400 hover:text-red-600"
+                    className="ml-auto text-xs font-black uppercase tracking-[0.18em] text-black hover:text-accent"
                     onClick={() => setUploads((prev) => prev.filter((x) => x.key !== u.key))}
                     aria-label={`Remove ${u.name}`}
                   >
-                    ✕
+                    Remove
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <div className="flex items-center gap-2 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
+
+        <div className="flex flex-wrap items-center gap-2 border-t-2 border-black bg-[#f2f2f2] px-5 py-4 lg:px-6">
           <Button onClick={send} disabled={sending}>
-            {sending ? "Sending…" : "Send"}
+            {sending ? "Sending..." : "Send"}
           </Button>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
-            📎 Attach
+          <label className="inline-flex h-11 cursor-pointer items-center justify-center border-2 border-black bg-white px-4 text-xs font-bold uppercase tracking-[0.18em] transition-colors hover:bg-black hover:text-white">
+            Attach
             <input
               type="file"
               multiple
@@ -303,16 +305,13 @@ function ComposeForm() {
               }}
             />
           </label>
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              const ok = await saveDraft();
-              toast(ok ? "success" : "error", ok ? "Draft saved" : "Could not save draft");
-            }}
-          >
+          <Button variant="secondary" onClick={async () => {
+            const ok = await saveDraft();
+            toast(ok ? "success" : "error", ok ? "Draft saved" : "Could not save draft");
+          }}>
             Save draft
           </Button>
-          <Button variant="ghost" onClick={discard} className="ml-auto">
+          <Button variant="secondary" onClick={discard} className="ml-auto">
             Discard
           </Button>
         </div>
@@ -323,7 +322,7 @@ function ComposeForm() {
 
 export default function ComposePage() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<PageLoader label="Loading composer" />}>
       <ComposeForm />
     </Suspense>
   );

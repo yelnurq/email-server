@@ -22,36 +22,38 @@ export default function SettingsPage() {
       setConfirm("");
       toast("success", "Password changed. Other sessions were signed out.");
     },
-    onError: (e) =>
-      toast("error", e instanceof ApiError ? e.message : "Could not change password"),
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "Could not change password"),
   });
 
   return (
-    <div className="mx-auto max-w-xl p-4">
-      <h1 className="mb-4 text-lg font-semibold">Settings</h1>
+    <div className="mx-auto max-w-4xl p-4 lg:p-6">
+      <div className="mb-4">
+        <p className="qazera-label text-accent">Settings</p>
+        <h1 className="mt-2 text-3xl font-black uppercase tracking-tight">Account</h1>
+      </div>
 
-      <section className="mb-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <h2 className="mb-3 text-sm font-semibold">Account</h2>
-        <dl className="space-y-1 text-sm">
-          <div className="flex gap-2">
-            <dt className="w-24 text-neutral-400">Name</dt>
-            <dd>{me.data?.display_name || "—"}</dd>
+      <section className="qazera-panel mb-6 p-5 lg:p-6">
+        <p className="qazera-label text-accent">Identity</p>
+        <dl className="mt-4 grid gap-4 text-sm lg:grid-cols-3">
+          <div className="qazera-panel-muted p-4">
+            <dt className="qazera-label">Name</dt>
+            <dd className="mt-2 text-sm">{me.data?.display_name || "—"}</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="w-24 text-neutral-400">Login</dt>
-            <dd>{me.data?.email}</dd>
+          <div className="qazera-panel-muted p-4">
+            <dt className="qazera-label">Login</dt>
+            <dd className="mt-2 text-sm break-all">{me.data?.email}</dd>
           </div>
-          <div className="flex gap-2">
-            <dt className="w-24 text-neutral-400">Roles</dt>
-            <dd className="text-neutral-500">{me.data?.roles.map((r) => r.role).join(", ")}</dd>
+          <div className="qazera-panel-muted p-4">
+            <dt className="qazera-label">Roles</dt>
+            <dd className="mt-2 text-sm">{me.data?.roles.map((r) => r.role).join(", ")}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <h2 className="mb-3 text-sm font-semibold">Change password</h2>
+      <section className="qazera-panel p-5 lg:p-6">
+        <p className="qazera-label text-accent">Change password</p>
         <form
-          className="space-y-3"
+          className="mt-4 space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
             if (next !== confirm) {
@@ -87,7 +89,7 @@ export default function SettingsPage() {
             required
           />
           <Button type="submit" disabled={change.isPending || !current || next.length < 10}>
-            {change.isPending ? "Saving…" : "Change password"}
+            {change.isPending ? "Saving..." : "Change password"}
           </Button>
         </form>
       </section>

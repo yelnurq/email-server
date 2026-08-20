@@ -70,100 +70,115 @@ export default function AliasesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="mb-4 text-lg font-semibold">Aliases</h1>
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">04. Desk</p>
+        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+          Aliases
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+          Aliases redirect mail with the logic of a newsroom switchboard. They keep public-facing
+          addresses stable while routing content to the right mailbox.
+        </p>
+      </section>
 
-      <form
-        className="mb-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (localPart.trim() && targetIds.length > 0) create.mutate();
-        }}
-      >
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-40">
-            <Input
-              label="Local part"
-              placeholder="support"
-              value={localPart}
-              onChange={(e) => setLocalPart(e.target.value)}
-            />
-          </div>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">Domain</span>
-            <select
-              value={domainId}
-              onChange={(e) => setDomainId(e.target.value)}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            >
-              {verifiedDomains.map((d) => (
-                <option key={d.id} value={d.id}>@{d.name}</option>
-              ))}
-            </select>
-          </label>
-          <Button type="submit" disabled={create.isPending || !localPart.trim() || targetIds.length === 0}>
-            {create.isPending ? "Creating…" : "Create alias"}
-          </Button>
-        </div>
-        <div className="mt-3">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            Delivers to
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {(mailboxes.data?.mailboxes ?? []).map((m) => (
-              <label
-                key={m.id}
-                className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-2 py-1 text-xs dark:border-neutral-700"
+      <section className="qazera-panel p-6">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New alias</p>
+        <form
+          className="mt-4 space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (localPart.trim() && targetIds.length > 0) create.mutate();
+          }}
+        >
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-56 flex-1">
+              <Input
+                label="Local part"
+                placeholder="support"
+                value={localPart}
+                onChange={(e) => setLocalPart(e.target.value)}
+              />
+            </div>
+            <label className="block min-w-52">
+              <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+                Domain
+              </span>
+              <select
+                value={domainId}
+                onChange={(e) => setDomainId(e.target.value)}
+                className="w-full border-b-2 border-[#111111] bg-transparent px-3 py-2 font-mono text-sm text-[#111111] outline-none"
               >
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-indigo-600"
-                  checked={targetIds.includes(m.id)}
-                  onChange={(e) =>
-                    setTargetIds((prev) =>
-                      e.target.checked ? [...prev, m.id] : prev.filter((x) => x !== m.id),
-                    )
-                  }
-                />
-                {m.address}
-              </label>
-            ))}
+                {verifiedDomains.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    @{d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit" disabled={create.isPending || !localPart.trim() || targetIds.length === 0}>
+              {create.isPending ? "Creating..." : "Create alias"}
+            </Button>
           </div>
-        </div>
-      </form>
 
-      {aliases.isLoading && <PageLoader />}
-      {aliases.isSuccess && aliases.data.aliases.length === 0 && <EmptyState title="No aliases yet" />}
+          <div>
+            <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+              Delivers to
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {(mailboxes.data?.mailboxes ?? []).map((m) => (
+                <label
+                  key={m.id}
+                  className="flex items-center gap-2 border border-[#111111] bg-[#e5e5e0] px-3 py-2 font-mono text-xs uppercase tracking-[0.18em]"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[#111111]"
+                    checked={targetIds.includes(m.id)}
+                    onChange={(e) =>
+                      setTargetIds((prev) =>
+                        e.target.checked ? [...prev, m.id] : prev.filter((x) => x !== m.id),
+                      )
+                    }
+                  />
+                  {m.address}
+                </label>
+              ))}
+            </div>
+          </div>
+        </form>
+      </section>
+
+      {aliases.isLoading && <PageLoader label="Loading aliases" />}
+      {aliases.isSuccess && aliases.data.aliases.length === 0 && (
+        <EmptyState title="No aliases yet" hint="Create the first routing rule for the paper desk." />
+      )}
       {aliases.isSuccess && aliases.data.aliases.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                <th className="px-4 py-2.5 font-medium">Alias</th>
-                <th className="px-4 py-2.5 font-medium">Delivers to</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium"></th>
+              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                <th className="px-4 py-3 font-medium">Alias</th>
+                <th className="px-4 py-3 font-medium">Delivers to</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            <tbody className="divide-y divide-[#111111]">
               {aliases.data.aliases.map((a) => (
                 <tr key={a.id}>
-                  <td className="px-4 py-2.5 font-medium">{a.address}</td>
-                  <td className="px-4 py-2.5 text-neutral-500">{a.targets.join(", ")}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-3 font-semibold">{a.address}</td>
+                  <td className="px-4 py-3 text-[#525252]">{a.targets.join(", ")}</td>
+                  <td className="px-4 py-3">
                     <button
                       onClick={() => toggle.mutate(a)}
-                      className={
-                        a.status === "active"
-                          ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500 dark:bg-neutral-800"
-                      }
+                      className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]"
                       title="Toggle status"
                     >
                       {a.status}
                     </button>
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-4 py-3 text-right">
                     <Button variant="ghost" onClick={() => remove.mutate(a.id)}>
                       Delete
                     </Button>

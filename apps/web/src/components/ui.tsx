@@ -1,8 +1,5 @@
 "use client";
 
-// Small shared UI kit: button, input, spinner, empty state, toasts.
-// Deliberately hand-rolled and dependency-free for Phase 1.
-
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
 export function cx(...parts: Array<string | false | undefined>) {
@@ -18,17 +15,19 @@ export function Button({
 }) {
   const styles = {
     primary:
-      "bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-indigo-300 dark:disabled:bg-indigo-900",
+      "bg-[#111111] text-[#f9f9f7] hover:bg-white hover:text-[#111111] hover:border-[#111111] disabled:bg-neutral-300 disabled:text-neutral-500",
     secondary:
-      "border border-neutral-300 text-neutral-800 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800",
+      "border border-[#111111] bg-transparent text-[#111111] hover:bg-[#111111] hover:text-[#f9f9f7] disabled:border-neutral-300 disabled:text-neutral-400",
     ghost:
-      "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800",
-    danger: "bg-red-600 text-white hover:bg-red-500 disabled:bg-red-300",
+      "bg-transparent text-[#111111] hover:bg-[#e5e5e0] disabled:text-neutral-400",
+    danger:
+      "border border-[#111111] bg-[#cc0000] text-white hover:bg-[#111111] disabled:bg-neutral-300 disabled:text-neutral-500",
   }[variant];
+
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-none px-4 text-xs font-bold uppercase tracking-[0.18em] transition-all duration-200 ease-out disabled:cursor-not-allowed font-sans",
         styles,
         className,
       )}
@@ -45,20 +44,16 @@ export function Input({
 }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }) {
   return (
     <label className="block">
-      {label && (
-        <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-          {label}
-        </span>
-      )}
+      {label && <span className="mb-2 block qazera-label">{label}</span>}
       <input
         className={cx(
-          "w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
-          error && "border-red-500",
+          "w-full rounded-none border-b-2 border-[#111111] bg-transparent px-3 py-2 text-sm text-[#111111] outline-none transition-colors placeholder:text-neutral-500 focus-visible:bg-[#f0f0f0] focus-visible:ring-0 font-mono",
+          error && "border-[#cc0000]",
           className,
         )}
         {...props}
       />
-      {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
+      {error && <span className="mt-2 block text-xs font-medium text-[#cc0000]">{error}</span>}
     </label>
   );
 }
@@ -70,14 +65,10 @@ export function Textarea({
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string }) {
   return (
     <label className="block">
-      {label && (
-        <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-          {label}
-        </span>
-      )}
+      {label && <span className="mb-2 block qazera-label">{label}</span>}
       <textarea
         className={cx(
-          "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
+          "w-full rounded-none border-b-2 border-[#111111] bg-transparent px-3 py-2 text-sm text-[#111111] outline-none transition-colors placeholder:text-neutral-500 focus-visible:bg-[#f0f0f0] focus-visible:ring-0 font-body",
           className,
         )}
         {...props}
@@ -90,7 +81,7 @@ export function Spinner({ className }: { className?: string }) {
   return (
     <span
       className={cx(
-        "inline-block h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-indigo-600",
+        "inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#111111] border-t-transparent",
         className,
       )}
       role="status"
@@ -101,7 +92,7 @@ export function Spinner({ className }: { className?: string }) {
 
 export function PageLoader({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex h-full min-h-40 items-center justify-center gap-2 text-sm text-neutral-500">
+    <div className="flex min-h-48 items-center justify-center gap-3 px-6 py-10 text-xs font-medium uppercase tracking-[0.2em] text-[#111111] font-sans">
       <Spinner /> {label}
     </div>
   );
@@ -109,27 +100,21 @@ export function PageLoader({ label = "Loading…" }: { label?: string }) {
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-1 p-8 text-center">
-      <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">{title}</p>
-      {hint && <p className="text-xs text-neutral-400">{hint}</p>}
+    <div className="newsprint-texture qazera-panel flex min-h-48 flex-col items-start justify-center gap-2 p-8">
+      <p className="qazera-label text-[#cc0000]">{title}</p>
+      {hint && <p className="max-w-md text-sm leading-6 text-[#111111] font-body">{hint}</p>}
     </div>
   );
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 p-8 text-center">
-      <p className="text-sm text-red-600 dark:text-red-400">{message}</p>
-      {onRetry && (
-        <Button variant="secondary" onClick={onRetry}>
-          Try again
-        </Button>
-      )}
+    <div className="newsprint-texture qazera-panel flex min-h-48 flex-col items-start justify-center gap-4 p-8">
+      <p className="qazera-label text-[#cc0000]">{message}</p>
+      {onRetry && <Button variant="secondary" onClick={onRetry}>Retry</Button>}
     </div>
   );
 }
-
-// ---- Toasts ----
 
 type Toast = { id: number; kind: "success" | "error"; text: string };
 const ToastCtx = createContext<(kind: Toast["kind"], text: string) => void>(() => {});
@@ -141,21 +126,23 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
+
   const push = useCallback((kind: Toast["kind"], text: string) => {
     const id = nextId.current++;
-    setToasts((t) => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    setToasts((items) => [...items, { id, kind, text }]);
+    setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 3600);
   }, []);
+
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(100vw-2rem,24rem)] flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={cx(
-              "pointer-events-auto rounded-lg px-4 py-2 text-sm text-white shadow-lg",
-              t.kind === "success" ? "bg-neutral-900 dark:bg-neutral-700" : "bg-red-600",
+              "pointer-events-auto qazera-panel px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] font-sans",
+              t.kind === "success" ? "bg-[#111111] text-[#f9f9f7]" : "bg-[#cc0000] text-white",
             )}
           >
             {t.text}
@@ -184,15 +171,16 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
-      <div
-        className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-900"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</h3>
-        {body && <p className="mt-1 text-sm text-neutral-500">{body}</p>}
-        <div className="mt-4 flex justify-end gap-2">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[1px]"
+      onClick={onCancel}
+    >
+      <div className="qazera-panel w-full max-w-md bg-[#f9f9f7] p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="qazera-label">{title}</h3>
+        {body && <p className="mt-3 text-sm leading-6 text-[#111111] font-body">{body}</p>}
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>

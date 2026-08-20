@@ -2,42 +2,38 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, formatDate } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { Button, ConfirmDialog, EmptyState, Input, PageLoader, useToast } from "@/components/ui";
 
 type ApiKey = {
   id: string;
-  organization_id: string;
   name: string;
   prefix: string;
   scopes: string[];
+  last_used_at: string | null;
   status: string;
-  expires_at?: string;
-  last_used_at?: string;
-  created_at: string;
 };
-
-type CreatedKey = { id: string; name: string; prefix: string; scopes: string[]; secret: string };
 
 export default function ApiKeysPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState("");
-  const [scopes, setScopes] = useState<string[]>(["emails.send", "emails.read"]);
-  const [created, setCreated] = useState<CreatedKey | null>(null);
+  const [scopes, setScopes] = useState<string[]>(["emails:write"]);
+  const [created, setCreated] = useState<{ secret: string; prefix: string } | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ApiKey | null>(null);
 
   const keys = useQuery({
     queryKey: ["admin", "api-keys"],
-    queryFn: () => api.get<{ api_keys: ApiKey[] }>("/api/v1/api-keys"),
+    queryFn: () => api.get<{ keys: ApiKey[] }>("/api/v1/api-keys"),
   });
 
   const create = useMutation({
-    mutationFn: () => api.post<CreatedKey>("/api/v1/api-keys", { name, scopes }),
-    onSuccess: (k) => {
+    mutationFn: () => api.post<{ secret: string; prefix: string }>("/api/v1/api-keys", { name, scopes }),
+    onSuccess: (res) => {
       setName("");
-      setCreated(k);
+      setCreated(res);
       qc.invalidateQueries({ queryKey: ["admin", "api-keys"] });
+      toast("success", "API key created");
     },
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "Could not create key"),
   });
@@ -45,117 +41,117 @@ export default function ApiKeysPage() {
   const revoke = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/api-keys/${id}`),
     onSuccess: () => {
-      setRevokeTarget(null);
       qc.invalidateQueries({ queryKey: ["admin", "api-keys"] });
-      toast("success", "Key revoked");
+      toast("success", "API key revoked");
+      setRevokeTarget(null);
     },
     onError: () => toast("error", "Could not revoke key"),
   });
 
-  function toggleScope(s: string) {
-    setScopes((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
-  }
+  const availableScopes = ["emails:write", "emails:read", "webhooks:write"];
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="mb-4 text-lg font-semibold">API Keys</h1>
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">08. Access</p>
+        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+          API Keys
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+          API keys are the external circulation desk. They allow trusted systems to publish mail
+          or inspect events without using a browser session.
+        </p>
+      </section>
 
-      <form
-        className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (name.trim() && scopes.length > 0) create.mutate();
-        }}
-      >
-        <div className="min-w-48 flex-1">
-          <Input label="Name" placeholder="CI pipeline" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="flex gap-3 pb-2">
-          {["emails.send", "emails.read"].map((s) => (
-            <label key={s} className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-indigo-600"
-                checked={scopes.includes(s)}
-                onChange={() => toggleScope(s)}
-              />
-              {s}
-            </label>
-          ))}
-        </div>
-        <Button type="submit" disabled={create.isPending || !name.trim() || scopes.length === 0}>
-          {create.isPending ? "Creating…" : "Create key"}
-        </Button>
-      </form>
+      <section className="qazera-panel p-6">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New key</p>
+        <form
+          className="mt-4 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim() && scopes.length > 0) create.mutate();
+          }}
+        >
+          <div className="min-w-64 flex-1">
+            <Input label="Name" placeholder="CI pipeline" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {availableScopes.map((scope) => (
+              <label
+                key={scope}
+                className="flex items-center gap-2 border border-[#111111] bg-[#e5e5e0] px-3 py-2 font-mono text-xs uppercase tracking-[0.18em]"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[#111111]"
+                  checked={scopes.includes(scope)}
+                  onChange={(e) =>
+                    setScopes((prev) =>
+                      e.target.checked ? [...prev, scope] : prev.filter((x) => x !== scope),
+                    )
+                  }
+                />
+                {scope}
+              </label>
+            ))}
+          </div>
+          <Button type="submit" disabled={create.isPending || !name.trim() || scopes.length === 0}>
+            Create key
+          </Button>
+        </form>
+      </section>
 
       {created && (
-        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-            Copy this secret now — it will not be shown again.
+        <section className="qazera-panel border-[#cc0000] bg-[#f9f9f7] p-6">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">
+            Secret shown once
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 font-mono text-xs dark:bg-neutral-900">
-              {created.secret}
-            </code>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                navigator.clipboard.writeText(created.secret);
-                toast("success", "Copied to clipboard");
-              }}
-            >
-              Copy
-            </Button>
-            <Button variant="ghost" onClick={() => setCreated(null)}>
-              Done
-            </Button>
+          <p className="mt-2 text-sm leading-6 font-body">
+            Save this secret now. It will not be shown again.
+          </p>
+          <div className="mt-4 border border-[#111111] bg-white p-4 font-mono text-xs break-all">
+            <div>prefix: {created.prefix}</div>
+            <div>secret: {created.secret}</div>
           </div>
-        </div>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={() => setCreated(null)}>Done</Button>
+          </div>
+        </section>
       )}
 
-      {keys.isLoading && <PageLoader />}
-      {keys.isSuccess && keys.data.api_keys.length === 0 && (
-        <EmptyState title="No API keys yet" hint="Create a key to use POST /api/v1/emails." />
+      {keys.isLoading && <PageLoader label="Loading API keys" />}
+      {keys.isSuccess && keys.data.keys.length === 0 && (
+        <EmptyState title="No API keys yet" hint="Create one to use the Email API." />
       )}
-      {keys.isSuccess && keys.data.api_keys.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      {keys.isSuccess && keys.data.keys.length > 0 && (
+        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                <th className="px-4 py-2.5 font-medium">Name</th>
-                <th className="px-4 py-2.5 font-medium">Key</th>
-                <th className="px-4 py-2.5 font-medium">Scopes</th>
-                <th className="px-4 py-2.5 font-medium">Last used</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium"></th>
+              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Key</th>
+                <th className="px-4 py-3 font-medium">Scopes</th>
+                <th className="px-4 py-3 font-medium">Last used</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {keys.data.api_keys.map((k) => (
+            <tbody className="divide-y divide-[#111111]">
+              {keys.data.keys.map((k) => (
                 <tr key={k.id}>
-                  <td className="px-4 py-2.5 font-medium">{k.name}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-neutral-500">{k.prefix}…</td>
-                  <td className="px-4 py-2.5 text-xs text-neutral-500">{k.scopes.join(", ")}</td>
-                  <td className="px-4 py-2.5 text-xs text-neutral-500">
-                    {k.last_used_at ? formatDate(k.last_used_at) : "never"}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={
-                        k.status === "active"
-                          ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          : "rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-950 dark:text-red-300"
-                      }
-                    >
+                  <td className="px-4 py-3 font-semibold">{k.name}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.prefix}…</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.scopes.join(", ")}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{k.last_used_at || "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
                       {k.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right">
-                    {k.status === "active" && (
-                      <Button variant="ghost" onClick={() => setRevokeTarget(k)}>
-                        Revoke
-                      </Button>
-                    )}
+                  <td className="px-4 py-3 text-right">
+                    <Button variant="ghost" onClick={() => setRevokeTarget(k)}>
+                      Revoke
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -166,8 +162,8 @@ export default function ApiKeysPage() {
 
       <ConfirmDialog
         open={!!revokeTarget}
-        title={`Revoke "${revokeTarget?.name}"?`}
-        body="Applications using this key will immediately lose access. This cannot be undone."
+        title="Revoke API key?"
+        body="This will immediately disable access for systems using the key."
         confirmLabel="Revoke"
         danger
         onCancel={() => setRevokeTarget(null)}

@@ -18,44 +18,43 @@ export default function MailboxesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <h1 className="mb-1 text-lg font-semibold">Mailboxes</h1>
-      <p className="mb-4 text-xs text-neutral-400">
-        Mailboxes are provisioned from the Users page (or via API). Each mailbox gets Inbox, Sent,
-        Drafts, Spam and Trash folders automatically.
-      </p>
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">07. Inventory</p>
+        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+          Mailboxes
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+          Mailboxes are the receiving desks of the platform. They inherit folders automatically and
+          show capacity at a glance.
+        </p>
+      </section>
 
-      {mailboxes.isLoading && <PageLoader />}
+      {mailboxes.isLoading && <PageLoader label="Loading mailboxes" />}
       {mailboxes.isSuccess && mailboxes.data.mailboxes.length === 0 && (
         <EmptyState title="No mailboxes yet" hint="Create a user with a mailbox first." />
       )}
       {mailboxes.isSuccess && mailboxes.data.mailboxes.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                <th className="px-4 py-2.5 font-medium">Address</th>
-                <th className="px-4 py-2.5 font-medium">Owner</th>
-                <th className="px-4 py-2.5 font-medium">Usage</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
+              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                <th className="px-4 py-3 font-medium">Address</th>
+                <th className="px-4 py-3 font-medium">Owner</th>
+                <th className="px-4 py-3 font-medium">Usage</th>
+                <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            <tbody className="divide-y divide-[#111111]">
               {mailboxes.data.mailboxes.map((m) => (
                 <tr key={m.id}>
-                  <td className="px-4 py-2.5 font-medium">{m.address}</td>
-                  <td className="px-4 py-2.5 text-neutral-500">{m.user_email || "shared"}</td>
-                  <td className="px-4 py-2.5 text-neutral-500">
+                  <td className="px-4 py-3 font-semibold">{m.address}</td>
+                  <td className="px-4 py-3 text-[#525252]">{m.user_email || "shared"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">
                     {formatBytes(m.used_bytes)} / {formatBytes(m.quota_bytes)}
                   </td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={
-                        m.status === "active"
-                          ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500 dark:bg-neutral-800"
-                      }
-                    >
+                  <td className="px-4 py-3">
+                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
                       {m.status}
                     </span>
                   </td>

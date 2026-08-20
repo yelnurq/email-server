@@ -85,47 +85,54 @@ export default function SecurityPage() {
   const resolved = (quarantine.data?.quarantine ?? []).filter((q) => q.status !== "pending");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <section>
-        <h1 className="mb-1 text-lg font-semibold">Security Center</h1>
-        <p className="mb-4 text-xs text-neutral-400">
-          Quarantined mail is held here and never reaches the recipient until released.
-          Risk bands: 0–40 allow · 41–60 spam folder · 61+ quarantine.
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">06. Security</p>
+        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+          Security Center
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+          Quarantine is the newsroom gatekeeper. It holds risky mail outside the inbox until a
+          human authorizes release or deletion.
         </p>
+      </section>
 
-        <h2 className="mb-2 text-sm font-semibold">Quarantine ({pending.length} pending)</h2>
-        {quarantine.isLoading && <PageLoader />}
+      <section className="qazera-panel p-6">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">
+          Quarantine ({pending.length} pending)
+        </p>
+        {quarantine.isLoading && <PageLoader label="Loading quarantine" />}
         {quarantine.isSuccess && pending.length === 0 && (
           <EmptyState title="Quarantine is empty" hint="Nothing is being held right now." />
         )}
         {pending.length > 0 && (
-          <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="mt-4 overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                  <th className="px-4 py-2.5 font-medium">From</th>
-                  <th className="px-4 py-2.5 font-medium">Subject</th>
-                  <th className="px-4 py-2.5 font-medium">To</th>
-                  <th className="px-4 py-2.5 font-medium">Risk</th>
-                  <th className="px-4 py-2.5 font-medium">Signals</th>
-                  <th className="px-4 py-2.5 font-medium">When</th>
-                  <th className="px-4 py-2.5 font-medium"></th>
+                <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                  <th className="px-4 py-3 font-medium">From</th>
+                  <th className="px-4 py-3 font-medium">Subject</th>
+                  <th className="px-4 py-3 font-medium">To</th>
+                  <th className="px-4 py-3 font-medium">Risk</th>
+                  <th className="px-4 py-3 font-medium">Signals</th>
+                  <th className="px-4 py-3 font-medium">When</th>
+                  <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              <tbody className="divide-y divide-[#111111]">
                 {pending.map((q) => (
                   <tr key={q.id}>
-                    <td className="px-4 py-2.5">{q.from}</td>
-                    <td className="max-w-56 truncate px-4 py-2.5">{q.subject}</td>
-                    <td className="px-4 py-2.5 text-neutral-500">{q.recipient_address}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-950 dark:text-red-300">
+                    <td className="px-4 py-3 font-semibold">{q.from}</td>
+                    <td className="max-w-56 truncate px-4 py-3">{q.subject}</td>
+                    <td className="px-4 py-3 text-[#525252]">{q.recipient_address}</td>
+                    <td className="px-4 py-3">
+                      <span className="border border-[#111111] bg-[#cc0000] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em] text-white">
                         {q.risk_score}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-neutral-500">{q.signals.join(", ")}</td>
-                    <td className="px-4 py-2.5 text-xs text-neutral-500">{formatDate(q.created_at)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                    <td className="px-4 py-3 text-xs text-[#525252]">{q.signals.join(", ")}</td>
+                    <td className="px-4 py-3 text-xs text-[#525252]">{formatDate(q.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
                       <Button variant="ghost" onClick={() => act.mutate({ id: q.id, action: "release" })}>
                         Release
                       </Button>
@@ -143,20 +150,22 @@ export default function SecurityPage() {
           </div>
         )}
         {resolved.length > 0 && (
-          <p className="mt-2 text-xs text-neutral-400">{resolved.length} resolved item(s) in history.</p>
+          <p className="mt-3 text-xs font-mono uppercase tracking-[0.3em] text-[#525252]">
+            {resolved.length} resolved item(s) in history.
+          </p>
         )}
       </section>
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">Sender blocks</h2>
+      <section className="qazera-panel p-6">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">Sender blocks</p>
         <form
-          className="mb-3 flex flex-wrap items-end gap-2 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+          className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             if (blockPattern.trim()) addBlock.mutate();
           }}
         >
-          <div className="w-64">
+          <div className="min-w-64 flex-1">
             <Input
               label="Address or domain"
               placeholder="spammer@evil.test or evil.test"
@@ -164,28 +173,29 @@ export default function SecurityPage() {
               onChange={(e) => setBlockPattern(e.target.value)}
             />
           </div>
-          <div className="min-w-48 flex-1">
+          <div className="min-w-64 flex-1">
             <Input label="Reason" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} />
           </div>
           <Button type="submit" disabled={addBlock.isPending || !blockPattern.trim()}>
             Block
           </Button>
         </form>
+
         {blocks.isSuccess && blocks.data.blocks.length === 0 && (
-          <p className="text-sm text-neutral-400">No blocked senders.</p>
+          <p className="mt-4 text-sm text-[#525252] font-body">No blocked senders.</p>
         )}
         {blocks.isSuccess && blocks.data.blocks.length > 0 && (
-          <ul className="space-y-1">
+          <ul className="mt-4 space-y-2">
             {blocks.data.blocks.map((b) => (
               <li
                 key={b.id}
-                className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900"
+                className="flex flex-wrap items-center gap-3 border border-[#111111] bg-[#f9f9f7] px-4 py-3 text-sm"
               >
-                <span className="font-mono">{b.pattern}</span>
-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800">
+                <span className="font-mono text-xs uppercase tracking-[0.3em]">{b.pattern}</span>
+                <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
                   {b.kind}
                 </span>
-                {b.reason && <span className="text-xs text-neutral-400">{b.reason}</span>}
+                {b.reason && <span className="text-xs text-[#525252]">{b.reason}</span>}
                 <Button variant="ghost" className="ml-auto" onClick={() => removeBlock.mutate(b.id)}>
                   Unblock
                 </Button>

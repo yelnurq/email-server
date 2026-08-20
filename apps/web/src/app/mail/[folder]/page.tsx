@@ -58,102 +58,121 @@ export default function FolderPage({ params }: { params: Promise<{ folder: strin
   const items = list.data?.messages ?? [];
   const total = list.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const title = folder === "search" ? `Search / ${q || "ALL"}` : folder.toUpperCase();
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-        <h1 className="text-sm font-semibold capitalize">
-          {folder === "search" ? `Search: “${q}”` : folder}
-        </h1>
-        <span className="text-xs text-neutral-400">{total} messages</span>
-        {selected.size > 0 && (
-          <div className="ml-auto flex items-center gap-1">
-            <span className="mr-1 text-xs text-neutral-500">{selected.size} selected</span>
-            <Button variant="ghost" onClick={() => bulk("read")}>Read</Button>
-            <Button variant="ghost" onClick={() => bulk("unread")}>Unread</Button>
-            <Button variant="ghost" onClick={() => bulk("star")}>Star</Button>
-            <Button variant="ghost" onClick={() => bulk(folder === "trash" ? "delete" : "trash")}>
-              {folder === "trash" ? "Delete forever" : "Delete"}
-            </Button>
+    <div className="min-h-[calc(100vh-89px)] bg-[#f9f9f7]">
+      <section className="border-b border-[#111111] bg-[#e5e5e0] px-4 py-5 lg:px-6">
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#cc0000]">
+              Mailbox
+            </p>
+            <h1 className="mt-3 font-serif text-4xl leading-none tracking-tight text-[#111111] lg:text-5xl">
+              {title}
+            </h1>
           </div>
-        )}
-        {selected.size === 0 && pages > 1 && (
-          <div className="ml-auto flex items-center gap-2 text-xs text-neutral-500">
-            <Button variant="ghost" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              ←
-            </Button>
-            {page + 1} / {pages}
-            <Button variant="ghost" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>
-              →
-            </Button>
-          </div>
-        )}
-      </div>
+          <p className="ml-auto font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+            {total} messages
+          </p>
 
-      {list.isLoading && <PageLoader />}
+          {selected.size > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <span className="border border-[#111111] bg-[#f9f9f7] px-3 py-2 font-mono text-xs uppercase tracking-[0.25em]">
+                {selected.size} selected
+              </span>
+              <Button variant="secondary" onClick={() => bulk("read")}>Read</Button>
+              <Button variant="secondary" onClick={() => bulk("unread")}>Unread</Button>
+              <Button variant="secondary" onClick={() => bulk("star")}>Star</Button>
+              <Button variant="secondary" onClick={() => bulk(folder === "trash" ? "delete" : "trash")}>
+                {folder === "trash" ? "Delete forever" : "Delete"}
+              </Button>
+            </div>
+          )}
+
+          {selected.size === 0 && pages > 1 && (
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                Prev
+              </Button>
+              <span className="font-mono text-xs uppercase tracking-[0.3em] text-[#525252]">
+                {page + 1} / {pages}
+              </span>
+              <Button variant="secondary" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {list.isLoading && <PageLoader label="Loading mail" />}
       {list.isError && <ErrorState message="Could not load messages" onRetry={() => list.refetch()} />}
       {list.isSuccess && items.length === 0 && (
-        <EmptyState
-          title={folder === "search" ? "No results" : "Nothing here"}
-          hint={folder === "inbox" ? "Messages sent to you will appear here." : undefined}
-        />
+        <div className="p-4 lg:p-6">
+          <EmptyState
+            title={folder === "search" ? "No results" : "Nothing here"}
+            hint={folder === "inbox" ? "Messages sent to you will appear here." : undefined}
+          />
+        </div>
       )}
 
-      <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+      <ul className="divide-y divide-[#111111]">
         {items.map((m) => (
-          <li key={m.id} className="group flex items-center gap-3 bg-white px-4 py-2.5 transition-colors hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-indigo-600"
-              checked={selected.has(m.id)}
-              onChange={(e) => {
-                const next = new Set(selected);
-                if (e.target.checked) next.add(m.id);
-                else next.delete(m.id);
-                setSelected(next);
-              }}
-              aria-label="Select message"
-            />
-            <button
-              className={cx("text-base", m.is_starred ? "text-amber-400" : "text-neutral-300 hover:text-amber-400")}
-              title={m.is_starred ? "Unstar" : "Star"}
-              onClick={async () => {
-                await api.patch(`/api/v1/mail/messages/${m.id}`, { is_starred: !m.is_starred });
-                qc.invalidateQueries({ queryKey: ["mail", "list"] });
-              }}
-            >
-              ★
-            </button>
-            <Link
-              href={folder === "drafts" ? `/mail/compose?draft=${m.id}` : `/mail/message/${m.id}`}
-              className="flex min-w-0 flex-1 items-baseline gap-3"
-              onClick={() => {
-                if (!m.is_read) {
-                  qc.setQueryData(["mail", "list", folder, q, page], (old: MessageList | undefined) =>
-                    old
-                      ? { ...old, messages: old.messages.map((x) => (x.id === m.id ? { ...x, is_read: true } : x)) }
-                      : old,
-                  );
-                }
-              }}
-            >
-              <span
+          <li key={m.id} className="bg-[#f9f9f7] transition-colors hover:bg-[#f2f2f2]">
+            <div className="flex items-start gap-3 px-4 py-4 lg:px-6">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 accent-[#111111]"
+                checked={selected.has(m.id)}
+                onChange={(e) => {
+                  const next = new Set(selected);
+                  if (e.target.checked) next.add(m.id);
+                  else next.delete(m.id);
+                  setSelected(next);
+                }}
+                aria-label="Select message"
+              />
+              <button
                 className={cx(
-                  "w-44 shrink-0 truncate text-sm",
-                  m.is_read ? "text-neutral-500" : "font-semibold",
+                  "mt-1 text-sm font-black uppercase tracking-[0.18em]",
+                  m.is_starred ? "text-[#cc0000]" : "text-[#a3a3a3] hover:text-[#111111]",
                 )}
+                title={m.is_starred ? "Unstar" : "Star"}
+                onClick={async () => {
+                  await api.patch(`/api/v1/mail/messages/${m.id}`, { is_starred: !m.is_starred });
+                  qc.invalidateQueries({ queryKey: ["mail", "list"] });
+                }}
               >
-                {m.from_display || m.from}
-              </span>
-              <span className={cx("truncate text-sm", m.is_read ? "text-neutral-500" : "font-medium")}>
-                {m.subject || "(no subject)"}
-              </span>
-              <span className="hidden truncate text-xs text-neutral-400 sm:inline">— {m.snippet}</span>
-              <span className="ml-auto shrink-0 text-xs text-neutral-400">
-                {m.has_attachments && <span className="mr-1">📎</span>}
-                {formatDate(m.date)}
-              </span>
-            </Link>
+                *
+              </button>
+
+              <Link
+                href={folder === "drafts" ? `/mail/compose?draft=${m.id}` : `/mail/message/${m.id}`}
+                className="flex min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:items-baseline lg:gap-4"
+                onClick={() => {
+                  if (!m.is_read) {
+                    qc.setQueryData(["mail", "list", folder, q, page], (old: MessageList | undefined) =>
+                      old
+                        ? { ...old, messages: old.messages.map((x) => (x.id === m.id ? { ...x, is_read: true } : x)) }
+                        : old,
+                    );
+                  }
+                }}
+              >
+                <span className={cx("w-full shrink-0 truncate font-body text-base lg:w-56", m.is_read ? "text-[#525252]" : "font-semibold text-[#111111]")}>
+                  {m.from_display || m.from}
+                </span>
+                <span className={cx("truncate font-serif text-lg tracking-tight", m.is_read ? "text-[#525252]" : "text-[#111111]")}>
+                  {m.subject || "(no subject)"}
+                </span>
+                <span className="hidden truncate font-body text-sm text-[#737373] lg:inline">— {m.snippet}</span>
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.25em] text-[#737373] lg:ml-auto">
+                  {m.has_attachments && <span className="mr-2">ATT</span>}
+                  {formatDate(m.date)}
+                </span>
+              </Link>
+            </div>
           </li>
         ))}
       </ul>

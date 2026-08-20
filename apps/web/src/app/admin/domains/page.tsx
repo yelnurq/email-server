@@ -20,8 +20,7 @@ export default function DomainsPage() {
     queryFn: () => api.get<{ domains: Domain[] }>("/api/v1/domains"),
   });
 
-  const orgName = (id: string) =>
-    orgs.data?.organizations.find((o) => o.id === id)?.name ?? id.slice(0, 8);
+  const orgName = (id: string) => orgs.data?.organizations.find((o) => o.id === id)?.name ?? id.slice(0, 8);
 
   const create = useMutation({
     mutationFn: () =>
@@ -39,76 +38,79 @@ export default function DomainsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <h1 className="mb-4 text-lg font-semibold">Domains</h1>
+    <div className="mx-auto max-w-screen-xl space-y-6">
+      <section className="qazera-panel newsprint-texture p-6 lg:p-8">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">03. Registry</p>
+        <h1 className="mt-4 font-serif text-5xl leading-[0.95] tracking-tighter text-[#111111] lg:text-7xl">
+          Domains
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-[#111111] font-body text-justify">
+          Domains determine where mail belongs and how the platform reasons about identity. In
+          this system, verification is deliberately explicit.
+        </p>
+      </section>
 
-      <form
-        className="mb-4 flex flex-wrap items-end gap-2 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (name.trim()) create.mutate();
-        }}
-      >
-        <div className="min-w-48 flex-1">
-          <Input
-            label="Domain name"
-            placeholder="company.test"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            Organization
-          </span>
-          <select
-            value={orgId}
-            onChange={(e) => setOrgId(e.target.value)}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          >
-            {(orgs.data?.organizations ?? []).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Button type="submit" disabled={create.isPending || !name.trim()}>
-          {create.isPending ? "Adding…" : "Add development domain"}
-        </Button>
-      </form>
-      <p className="mb-4 text-xs text-neutral-400">
-        Development domains (e.g. <code>company.test</code>) are verified immediately and work only
-        inside this local platform. DNS-verified production domains arrive in a later phase.
-      </p>
+      <section className="qazera-panel p-6">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#cc0000]">New domain</p>
+        <form
+          className="mt-4 flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) create.mutate();
+          }}
+        >
+          <div className="min-w-64 flex-1">
+            <Input label="Domain name" placeholder="company.test" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <label className="block min-w-52">
+            <span className="mb-2 block font-mono text-xs uppercase tracking-[0.3em] text-[#111111]">
+              Organization
+            </span>
+            <select
+              value={orgId}
+              onChange={(e) => setOrgId(e.target.value)}
+              className="w-full border-b-2 border-[#111111] bg-transparent px-3 py-2 font-mono text-sm text-[#111111] outline-none"
+            >
+              {(orgs.data?.organizations ?? []).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="submit" disabled={create.isPending || !name.trim()}>
+            {create.isPending ? "Adding..." : "Add development domain"}
+          </Button>
+        </form>
+        <p className="mt-4 text-sm leading-6 text-[#525252] font-body">
+          Development domains such as <code className="font-mono">company.test</code> are
+          verified immediately and work only inside this local platform.
+        </p>
+      </section>
 
-      {domains.isLoading && <PageLoader />}
-      {domains.isSuccess && domains.data.domains.length === 0 && <EmptyState title="No domains yet" />}
+      {domains.isLoading && <PageLoader label="Loading domains" />}
+      {domains.isSuccess && domains.data.domains.length === 0 && (
+        <EmptyState title="No domains yet" hint="Add the first local development domain to continue." />
+      )}
       {domains.isSuccess && domains.data.domains.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="overflow-x-auto border border-[#111111] bg-[#f9f9f7]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-400 dark:border-neutral-800">
-                <th className="px-4 py-2.5 font-medium">Domain</th>
-                <th className="px-4 py-2.5 font-medium">Organization</th>
-                <th className="px-4 py-2.5 font-medium">Mode</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
+              <tr className="border-b border-[#111111] text-left font-mono text-xs uppercase tracking-[0.3em]">
+                <th className="px-4 py-3 font-medium">Domain</th>
+                <th className="px-4 py-3 font-medium">Organization</th>
+                <th className="px-4 py-3 font-medium">Mode</th>
+                <th className="px-4 py-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            <tbody className="divide-y divide-[#111111]">
               {domains.data.domains.map((d) => (
                 <tr key={d.id}>
-                  <td className="px-4 py-2.5 font-medium">{d.name}</td>
-                  <td className="px-4 py-2.5 text-neutral-500">{orgName(d.organization_id)}</td>
-                  <td className="px-4 py-2.5 text-neutral-500">{d.verification_mode}</td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={
-                        d.status === "verified"
-                          ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                          : "rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                      }
-                    >
+                  <td className="px-4 py-3 font-semibold">{d.name}</td>
+                  <td className="px-4 py-3 text-[#525252]">{orgName(d.organization_id)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#525252]">{d.verification_mode}</td>
+                  <td className="px-4 py-3">
+                    <span className="border border-[#111111] bg-[#e5e5e0] px-2 py-1 font-mono text-xs uppercase tracking-[0.2em]">
                       {d.status}
                     </span>
                   </td>

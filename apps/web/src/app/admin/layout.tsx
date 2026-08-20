@@ -25,7 +25,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const me = useMe();
   const router = useRouter();
   const pathname = usePathname();
-
   const canAdmin = me.data?.permissions.includes("users.manage") ?? false;
 
   useEffect(() => {
@@ -36,59 +35,51 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (me.isLoading || !me.data || !canAdmin) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <PageLoader />
+      <main className="qazera-noise flex min-h-screen items-center justify-center bg-white">
+        <PageLoader label="QazEra Control" />
       </main>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-4 border-b border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-800 dark:bg-neutral-900">
-        <Link href="/admin" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-white dark:bg-neutral-700">
-            M
-          </span>
-          <span className="text-sm font-semibold">Admin Portal</span>
-        </Link>
-        <nav className="hidden gap-1 sm:flex">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={cx(
-                "rounded-lg px-3 py-1.5 text-sm transition-colors",
-                pathname === n.href
-                  ? "bg-neutral-100 font-semibold dark:bg-neutral-800"
-                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800",
-              )}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-        <Link
-          href="/mail/inbox"
-          className="ml-auto rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950"
-        >
-          ← Webmail
-        </Link>
-      </header>
-      <nav className="flex gap-1 overflow-x-auto border-b border-neutral-200 bg-white px-2 py-1 sm:hidden dark:border-neutral-800 dark:bg-neutral-900">
-        {NAV.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className={cx(
-              "whitespace-nowrap rounded-lg px-3 py-1 text-sm",
-              pathname === n.href ? "bg-neutral-100 font-semibold dark:bg-neutral-800" : "text-neutral-600",
-            )}
-          >
-            {n.label}
+    <div className="qazera-noise flex min-h-screen flex-col bg-white">
+      <header className="border-b-2 border-black bg-white">
+        <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:px-6">
+          <Link href="/admin" className="flex items-center gap-3">
+            <span className="qazera-panel flex h-11 w-11 items-center justify-center bg-black text-sm font-black text-white">
+              Q
+            </span>
+            <div>
+              <p className="qazera-label text-accent">Control plane</p>
+              <p className="mt-1 text-sm font-black uppercase tracking-[0.18em]">QazEra Admin</p>
+            </div>
           </Link>
-        ))}
-      </nav>
-      <main className="min-h-0 flex-1 overflow-y-auto p-4">{children}</main>
+
+          <nav className="flex gap-2 overflow-x-auto lg:mx-6 lg:flex-wrap">
+            {NAV.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={cx(
+                  "whitespace-nowrap border-2 border-black px-3 py-2 text-xs font-black uppercase tracking-[0.16em] transition-colors",
+                  pathname === n.href ? "bg-black text-white" : "bg-white hover:bg-accent hover:text-white",
+                )}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+
+          <Link
+            href="/mail/inbox"
+            className="ml-auto border-2 border-black bg-[#f2f2f2] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] transition-colors hover:bg-black hover:text-white"
+          >
+            Webmail
+          </Link>
+        </div>
+      </header>
+
+      <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
     </div>
   );
 }
