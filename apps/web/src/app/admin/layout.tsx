@@ -69,6 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [open, setOpen] = useState(false);
   const { t } = useI18n();
   const canAdmin = GROUPS.some((group) => group.items.some((item) => item.permission && me.data?.permissions.includes(item.permission)));
+  const canMail = me.data?.permissions.includes("mail.read") || me.data?.permissions.includes("mail.send");
 
   useEffect(() => {
     if (me.isLoading) return;
@@ -139,9 +140,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="shrink-0 border-t border-border p-3">
-          <Link href="/mail/inbox" className="flex h-8 items-center gap-2.5 rounded-[7px] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <Icon name="corner-up-left" className="h-4 w-4 opacity-70" /> {t("backToMail")}
-          </Link>
+          {canMail && (
+            <Link href="/mail/inbox" className="flex h-8 items-center gap-2.5 rounded-[7px] px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <Icon name="corner-up-left" className="h-4 w-4 opacity-70" /> {t("backToMail")}
+            </Link>
+          )}
           <Menu
             align="start"
             width="w-56"
@@ -156,8 +159,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </button>
             }
             items={[
-              { label: t("settings"), icon: "settings", onSelect: () => router.push("/mail/settings") },
-              { label: t("backToMail"), icon: "inbox", onSelect: () => router.push("/mail/inbox") },
+              ...(canMail ? [{ label: t("settings"), icon: "settings", onSelect: () => router.push("/mail/settings") }] : []),
+              ...(canMail ? [{ label: t("backToMail"), icon: "inbox", onSelect: () => router.push("/mail/inbox") }] : []),
               { type: "separator" as const },
               { label: t("signOut"), icon: "log-out", danger: true, onSelect: () => void logout() },
             ]}
