@@ -19,11 +19,13 @@ export function RecipientSelector({
   onChange,
   autoFocus,
   placeholder,
+  onPendingAddressChange,
 }: {
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
   placeholder?: string;
+  onPendingAddressChange?: (value: string) => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -75,6 +77,7 @@ export function RecipientSelector({
     if (typed.length === 0) return;
     commit([...selected, ...typed]);
     setSearch("");
+    onPendingAddressChange?.("");
   }
 
   const allVisibleSelected =
@@ -102,7 +105,17 @@ export function RecipientSelector({
         <input
           autoFocus={autoFocus}
           value={search}
-          onChange={(event) => { setSearch(event.target.value); setOpen(true); }}
+          onChange={(event) => {
+            const next = event.target.value;
+            setSearch(next);
+            onPendingAddressChange?.(next.includes("@") ? next : "");
+            setOpen(true);
+          }}
+          onBlur={() => {
+            // A typed address is also valid without a trailing Enter/comma.
+            // Commit it before actions such as Send read the controlled value.
+            addTyped();
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === "," || event.key === ";") {
               if (search.includes("@")) { event.preventDefault(); addTyped(); }
