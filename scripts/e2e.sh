@@ -374,7 +374,90 @@ case "$prov" in
   *) fail "domain provisioning status ($prov)" ;;
 esac
 
-# --- 14. Sessions ------------------------------------------------------------
+# --- 14. Unified mail store: webmail id is the mail-store id ------------------
+# The message A1 sent to A2 must be reachable by the same identifier through
+# the webmail API, and carry an RFC Message-ID (the cross-store identity).
+first_id=$(curl -s "$API/api/v1/mail/messages?folder=inbox&limit=1" -H "Authorization: Bearer $T2" | jsonval id)
+first_rfc=$(curl -s "$API/api/v1/mail/messages?folder=inbox&limit=1" -H "Authorization: Bearer $T2" | jsonval message_id)
+[ -n "$first_id" ] && pass "inbox item has a mail-store id" || fail "inbox item id"
+case "$first_rfc" in
+  *@*) pass "inbox item carries an RFC Message-ID ($first_rfc)" ;;
+  *) fail "inbox item has no RFC Message-ID" ;;
+esac
+
+# Flags are protocol flags: setting them through webmail must be readable back.
+curl -s -X PATCH "$API/api/v1/mail/messages/$first_id" -H "Authorization: Bearer $T2" \
+  -H "Content-Type: application/json" -d '{"is_starred":true}' > /dev/null
+starred=$(curl -s "$API/api/v1/mail/messages/$first_id" -H "Authorization: Bearer $T2" | grep -o '"is_starred":true')
+[ -n "$starred" ] && pass "flag set through webmail persists in the mail store" || fail "flag persistence"
+
+# --- 15. Drafts live in the mail store ---------------------------------------
+d1=$(curl -s -X POST "$API/api/v1/mail/drafts" -H "Authorization: Bearer $T1" \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":[\"$A2\"],\"subject\":\"draft $R\",\"text\":\"v1\"}" | jsonval id)
+[ -n "$d1" ] && pass "draft created in the mail store" || fail "draft create"
+d2=$(curl -s -X PUT "$API/api/v1/mail/drafts/$d1" -H "Authorization: Bearer $T1" \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":[\"$A2\"],\"subject\":\"draft $R\",\"text\":\"v2\"}" | jsonval id)
+[ -n "$d2" ] && pass "draft update returns the current id" || fail "draft update"
+dcount=$(curl -s "$API/api/v1/mail/messages?folder=drafts" -H "Authorization: Bearer $T1" | grep -o "draft $R" | wc -l)
+[ "$dcount" -eq 1 ] && pass "draft update leaves exactly one copy" || fail "draft duplicated ($dcount copies)"
+
+# --- 16. Inbound SMTP from outside the platform ------------------------------
+# Delivered straight to the mail core on the MTA port, unauthenticated, the
+# way a foreign server would.
+if command -v python3 > /dev/null 2>&1; then
+  python3 - "$DOMAIN" "$A1" "$R" <<'PYEOF' > "$TMPDIR_E2E/inbound.out" 2>&1
+import smtplib, ssl, sys, socket
+domain, rcpt, run = sys.argv[1], sys.argv[2], sys.argv[3]
+host = "mailplatform-stalwart" if socket.gethostbyname_ex("mailplatform-stalwart")[2:] else "localhost"
+msg = (f"From: <outsider@external-sender.test>\r\nTo: <{rcpt}>\r\n"
+       f"Subject: inbound {run}\r\nMessage-ID: <inbound-{run}@external-sender.test>\r\n\r\nhello\r\n")
+s = smtplib.SMTP(host, 25, timeout=20)
+s.helo("external-sender.test")
+s.sendmail("outsider@external-sender.test", [rcpt], msg)
+s.quit()
+print("SENT")
+PYEOF
+  if grep -q SENT "$TMPDIR_E2E/inbound.out"; then
+    pass "inbound SMTP accepted by the mail core"
+    # Unauthenticated mail with no SPF/DKIM/DMARC is expected in Junk.
+    found=""
+    for _ in $(seq 1 15); do
+      for folder in spam inbox; do
+        if curl -s "$API/api/v1/mail/messages?folder=$folder" -H "Authorization: Bearer $T1" | grep -q "inbound $R"; then
+          found="$folder"; break
+        fi
+      done
+      [ -n "$found" ] && break
+      sleep 1
+    done
+    [ -n "$found" ] && pass "inbound message delivered to the mailbox ($found)" || fail "inbound message not delivered"
+  else
+    fail "inbound SMTP rejected: $(head -3 "$TMPDIR_E2E/inbound.out")"
+  fi
+  # An unknown recipient must be refused at RCPT time, never accepted-then-dropped.
+  python3 - "$DOMAIN" <<'PYEOF' > "$TMPDIR_E2E/unknown.out" 2>&1
+import smtplib, sys, socket
+domain = sys.argv[1]
+host = "mailplatform-stalwart" if socket.gethostbyname_ex("mailplatform-stalwart")[2:] else "localhost"
+s = smtplib.SMTP(host, 25, timeout=20)
+s.helo("external-sender.test")
+s.mail("outsider@external-sender.test")
+code, _ = s.rcpt(f"definitely-no-such-user@{domain}")
+print("RCPTCODE", code)
+s.quit()
+PYEOF
+  code=$(sed -n 's/^RCPTCODE \([0-9]*\)/\1/p' "$TMPDIR_E2E/unknown.out")
+  case "$code" in
+    55*) pass "unknown recipient rejected at RCPT ($code)" ;;
+    *) fail "unknown recipient not rejected (code=$code)" ;;
+  esac
+else
+  say "  SKIP: python3 not found, inbound SMTP checks skipped"
+fi
+
+# --- 17. Sessions ------------------------------------------------------------
 curl -s -X POST "$API/api/v1/auth/logout" -H "Authorization: Bearer $T2" > /dev/null
 st=$(code GET /api/v1/mail/summary "$T2")
 [ "$st" = "401" ] && pass "revoked session rejected" || fail "session revocation ($st)"

@@ -52,7 +52,7 @@ func TestBuildMessagePlainUnicode(t *testing.T) {
 	raw := BuildMessage(Envelope{
 		From: "a@company.test", FromDisplay: "Әсем Қыз",
 		To: []string{"b@company.test"}, Subject: "Отчёт: Қазақша тақырып",
-		Date: time.Date(2026, 8, 21, 10, 0, 0, 0, time.UTC),
+		Date:  time.Date(2026, 8, 21, 10, 0, 0, 0, time.UTC),
 		RFCID: "<u1@company.test>", Text: "Кириллица и қазақ әріптері",
 	})
 	m := parse(t, raw)

@@ -55,6 +55,18 @@ compression = "lz4"
 type = "internal"
 store = "rocksdb"
 
+# Outbound delivery to the controlled test target needs no routing rule:
+# the smtpsink container carries the network alias sink.test, so the mail
+# core's normal implicit-MX path resolves and reaches it. Real domains keep
+# taking the ordinary MX route.
+
+# Retry schedule for deferred (4xx) recipients: short in development so a
+# temporary-failure test does not wait minutes for the second attempt.
+[queue.schedule]
+retry = ["20s", "60s", "5m", "15m"]
+notify = ["1d"]
+expire = "3d"
+
 [tracer.stdout]
 type = "stdout"
 level = "info"

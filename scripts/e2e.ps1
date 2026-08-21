@@ -30,5 +30,6 @@ docker run --rm `
     -e "STALWART_HTTP=http://host.docker.internal:${StalwartHttpPort}" `
     -e "STALWART_ADMIN_PASSWORD=${StalwartAdminPassword}" `
     -e "STALWART_MASTER_PASSWORD=${StalwartMasterPassword}" `
-    docker:cli sh -c "apk add -q bash curl nodejs && tr -d '\r' < scripts/e2e.sh > /tmp/e2e.sh && cd /w && bash /tmp/e2e.sh"
+    --network mail-platform_default `
+    docker:cli sh -c "apk add -q bash curl nodejs python3 && tr -d '\r' < scripts/e2e.sh > /tmp/e2e.sh && cd /w && bash /tmp/e2e.sh"
 exit $LASTEXITCODE

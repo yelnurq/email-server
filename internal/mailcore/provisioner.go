@@ -102,10 +102,10 @@ func (p *Provisioner) runDueJobs(ctx context.Context) {
 		return
 	}
 	type job struct {
-		id                        int64
-		tenantID, kind, entityID  string
-		actorUserID               string
-		attempts                  int
+		id                       int64
+		tenantID, kind, entityID string
+		actorUserID              string
+		attempts                 int
 	}
 	var jobs []job
 	for rows.Next() {

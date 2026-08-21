@@ -136,8 +136,18 @@ go run ./cmd/mailcheck -smtp localhost:1587 -http http://localhost:8180 \
   -to user1@company.test -to-pass <recipient credential password>
 ```
 
-Webmail continues to read from the platform's own data plane (PostgreSQL);
-bridging the two message stores is the next phase (see PROJECT_STATUS).
+**Webmail reads and writes the same store** as IMAP/JMAP clients
+([ADR-003](docs/adr/ADR-003-unified-mail-storage.md)): mailbox contents,
+folders and flags live in Stalwart, while PostgreSQL keeps the control plane
+(users, domains, policies, audit) and the message trace. A message sent from
+webmail carries one identity across webmail, JMAP and IMAP, and a star set
+in one client shows up in the others.
+
+Operational procedures — mail not arriving, deferred outbound, provisioning
+failures, mail core down — are in [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+Legacy mail from before the unification is backfilled with
+`make migrate-mail` (idempotent; `make migrate-mail-dry` previews).
 
 ## Health
 

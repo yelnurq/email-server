@@ -3,10 +3,11 @@
 Updated: 2026-08-20 (night, stage 2). States: VERIFIED (tested by
 command/E2E), IN PROGRESS, NOT STARTED, BLOCKED.
 
-Automated gate: `scripts/e2e.sh` — **46 checks, all passing** (on Windows:
-`scripts/e2e.ps1` runs the same suite in a docker:cli container) — plus Go
-unit tests, `gofmt`/`go vet`, `tsc`, `eslint`, `next build`, and restart
-persistence checks (compose services and Stalwart).
+Automated gate: `scripts/e2e.sh` — **60 checks, all passing** (on Windows:
+`scripts/e2e.ps1` runs the same suite in a docker:cli container attached to
+the compose network) — plus Go unit tests, `gofmt`/`go vet`, `tsc`,
+`eslint`, `next build`, and restart persistence checks (compose services and
+Stalwart).
 
 ## VERIFIED
 
@@ -96,15 +97,51 @@ audit — all RBAC-guarded
 
 - (nothing mid-flight)
 
+**Unified mail store — stage 3, VERIFIED (ADR-003)**
+- Stalwart is now the authoritative store for Business Mail. Webmail reads
+  and writes mailboxes over JMAP with master-user authentication; the
+  PostgreSQL `mailbox_messages` write path is retired for Business Mail
+- **Gate 1** — one message, three interfaces: a webmail send is readable in
+  webmail, JMAP and IMAP under the same store id and RFC Message-ID;
+  read/star set in webmail appear as `\Seen \Flagged` over IMAP
+- **Gate 2** — inbound SMTP from outside (port 25, unauthenticated) is
+  accepted, classified by the mail core (no SPF/DKIM/DMARC ⇒ Junk) and
+  visible identically in webmail and IMAP; unknown recipients are refused
+  at RCPT with 550 (never accepted-then-dropped)
+- **Gate 3** — outbound through the mail core's queue against a controlled
+  SMTP target (`cmd/smtpsink`, compose profile `test`, alias `sink.test`):
+  250 delivered, 451 queued with `retry_num` advancing and the verbatim
+  remote reply retained, 550 bounced with a DSN quoting the reply
+- **Gate 4** — recovery without manual intervention: with Stalwart stopped,
+  webmail degrades to 503 `MAIL_SERVICE_UNAVAILABLE`, sends are still
+  accepted durably and provisioning jobs stay pending; on restart the mail
+  is delivered and the jobs complete (observed: 3 attempts → done)
+- Async provisioning: `provisioning_jobs` + worker with backoff replaced the
+  synchronous in-handler calls
+- Drafts live in the store's Drafts folder (visible to mail clients); the
+  store has no in-place update, so each save writes a new copy and destroys
+  the old one — the API returns the current id
+- Legacy backfill: `cmd/migrate-mail` moved all 27 pre-V3 copies into the
+  store, idempotent by Message-ID (proven by re-running with the stamps
+  cleared: 27 skipped, 0 duplicates), plus `-dedupe` reconciliation
+- Secret redaction tests (`internal/mailservice/redaction_test.go`) caught a
+  real leak: an echoed `Authorization` header in an upstream error body put
+  the master credential into error strings and logs. Fixed by redacting
+  upstream bodies at the client boundary
+
 ## NOT STARTED (deliberately deferred, with reasons)
 
-- Webmail ↔ Stalwart message-store bridge — webmail still reads our data
-  plane (per ADR-001 boundary); mail submitted via SMTP lives in Stalwart's
-  store and is visible to IMAP/JMAP clients but not in webmail (and vice
-  versa). Requires an inbound-delivery integration decision (LMTP into our
-  pipeline vs JMAP read-through) — next mail-core phase
+- DKIM signing — the mail core logs `DKIM signer not found`; outbound mail
+  is unsigned. Needs key provisioning + storage design (P1)
 - DNS verification (MX/SPF/DKIM/DMARC checks) — needs the internet phase for
   real records; `dns`-mode domains stay pending by design
+- Rspamd / ClamAV — inbound classification currently comes from Stalwart's
+  built-in filter plus our deterministic risk engine. Their failure policy
+  (fail-open / fail-closed / defer) must be fixed in an ADR before wiring
+- Queue Center and Deliverability UI — the data exists (mail-core queue API,
+  message events); the admin surfaces are not built
+- Public-internet delivery — never exercised: no public IP, no port 25
+  ingress, no PTR. Everything above is controlled-environment only
 - Rspamd/ClamAV integration — after mail core bridge; risk engine already
   exposes the Verdict seam they plug into
 - Forgot/reset password flow — design noted in SECURITY.md

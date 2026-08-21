@@ -60,7 +60,6 @@ func main() {
 	}
 }
 
-
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {

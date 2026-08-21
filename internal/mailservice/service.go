@@ -198,16 +198,16 @@ type emailAddress struct {
 }
 
 type emailMeta struct {
-	ID            string           `json:"id"`
-	ThreadID      string           `json:"threadId"`
-	MessageID     []string         `json:"messageId"`
-	Keywords      map[string]bool  `json:"keywords"`
-	From          []emailAddress   `json:"from"`
-	Subject       string           `json:"subject"`
-	Preview       string           `json:"preview"`
-	ReceivedAt    string           `json:"receivedAt"`
-	HasAttachment bool             `json:"hasAttachment"`
-	MailboxIds    map[string]bool  `json:"mailboxIds"`
+	ID            string          `json:"id"`
+	ThreadID      string          `json:"threadId"`
+	MessageID     []string        `json:"messageId"`
+	Keywords      map[string]bool `json:"keywords"`
+	From          []emailAddress  `json:"from"`
+	Subject       string          `json:"subject"`
+	Preview       string          `json:"preview"`
+	ReceivedAt    string          `json:"receivedAt"`
+	HasAttachment bool            `json:"hasAttachment"`
+	MailboxIds    map[string]bool `json:"mailboxIds"`
 }
 
 func metaToItem(m emailMeta) ListItem {
@@ -387,12 +387,12 @@ func (s *Service) GetMessage(ctx context.Context, email, id string) (*Message, e
 	var resp struct {
 		List []struct {
 			emailMeta
-			InReplyTo   []string       `json:"inReplyTo"`
-			References  []string       `json:"references"`
-			To          []emailAddress `json:"to"`
-			Cc          []emailAddress `json:"cc"`
-			Bcc         []emailAddress `json:"bcc"`
-			BodyValues  map[string]struct {
+			InReplyTo  []string       `json:"inReplyTo"`
+			References []string       `json:"references"`
+			To         []emailAddress `json:"to"`
+			Cc         []emailAddress `json:"cc"`
+			Bcc        []emailAddress `json:"bcc"`
+			BodyValues map[string]struct {
 				Value string `json:"value"`
 			} `json:"bodyValues"`
 			TextBody    []bodyPart `json:"textBody"`
@@ -596,15 +596,20 @@ func (s *Service) Import(ctx context.Context, email, folderType string, raw []by
 	if seen {
 		keywords["$seen"] = true
 	}
+	emailArgs := map[string]any{
+		"blobId":     blobID,
+		"mailboxIds": map[string]bool{mb.ID: true},
+		"keywords":   keywords,
+	}
+	// Preserve the original arrival time when the caller knows it (legacy
+	// migration); otherwise the store stamps "now", which is correct for
+	// live delivery.
+	if at, ok := receivedAtFrom(ctx); ok {
+		emailArgs["receivedAt"] = at.UTC().Format("2006-01-02T15:04:05Z")
+	}
 	out, err := s.JMAP.Request(ctx, email, Call("0", "Email/import", map[string]any{
 		"accountId": info.AccountID,
-		"emails": map[string]any{
-			"m1": map[string]any{
-				"blobId":     blobID,
-				"mailboxIds": map[string]bool{mb.ID: true},
-				"keywords":   keywords,
-			},
-		},
+		"emails":    map[string]any{"m1": emailArgs},
 	}))
 	if err != nil {
 		return "", err
@@ -671,6 +676,32 @@ func (s *Service) SubmitExternal(ctx context.Context, fromAccount, mailFrom stri
 		return fmt.Errorf("finish: %w", err)
 	}
 	return c.Quit()
+}
+
+// NormalizeMessageID strips the RFC 5322 angle brackets so identifiers can
+// be compared across stores: the control plane persists "<id@domain>" while
+// JMAP reports the bare "id@domain".
+func NormalizeMessageID(id string) string {
+	id = strings.TrimSpace(id)
+	id = strings.TrimPrefix(id, "<")
+	id = strings.TrimSuffix(id, ">")
+	return strings.ToLower(id)
+}
+
+// receivedAtKey carries an explicit arrival timestamp for Import. It is a
+// context value rather than a parameter so the delivery path (the common
+// case, which wants "now") stays unchanged.
+type receivedAtKey struct{}
+
+// WithReceivedAt returns a context that makes Import preserve the given
+// arrival time — used by the legacy migration to keep original dates.
+func WithReceivedAt(ctx context.Context, at time.Time) context.Context {
+	return context.WithValue(ctx, receivedAtKey{}, at)
+}
+
+func receivedAtFrom(ctx context.Context) (time.Time, bool) {
+	at, ok := ctx.Value(receivedAtKey{}).(time.Time)
+	return at, ok && !at.IsZero()
 }
 
 // OpenBlob streams one blob (attachment) from the account's store.

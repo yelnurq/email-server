@@ -91,6 +91,11 @@ services:
     environment:
       STALWART_ADMIN_SECRET: ${STALWART_ADMIN_PASSWORD:-stalwart_dev_admin}
       STALWART_MASTER_SECRET: ${STALWART_MASTER_PASSWORD:-stalwart_dev_master}
+      # Controlled delivery-test target (cmd/smtpsink) for the sink.test
+      # domain; runs on the host during tests.
+      SMTPSINK_HOST: ${SMTPSINK_HOST:-host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${STALWART_SMTP_PORT:-2525}:25"
       - "${STALWART_SUBMISSION_PORT:-1587}:587"
@@ -110,9 +115,30 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Controlled SMTP delivery target for outbound tests (cmd/smtpsink).
+  # It answers on the reserved domain sink.test via a network alias, so the
+  # mail core reaches it through its normal implicit-MX path — no special
+  # routing rules, no dependency on a public provider. The recipient's local
+  # part selects the response: ok… → 250, defer… → 451, bounce… → 550.
+  # Build the binary first: see `make sink-build`.
+  smtpsink:
+    image: alpine:3.20
+    container_name: mailplatform-smtpsink
+    command: ["/smtpsink", "-addr", ":25", "-log", "/data/sink.jsonl"]
+    volumes:
+      - ./bin/smtpsink-linux:/smtpsink:ro
+      - sinkdata:/data
+    networks:
+      default:
+        aliases:
+          - sink.test
+    restart: unless-stopped
+    profiles: ["test"]
+
 volumes:
   pgdata:
   redisdata:
   natsdata:
   miniodata:
   stalwartdata:
+  sinkdata:

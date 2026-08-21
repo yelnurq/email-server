@@ -8,12 +8,14 @@ package mailservice
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -74,7 +76,7 @@ func (c *JMAP) Session(ctx context.Context, account string) (*Session, error) {
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("jmap session: HTTP %d: %s", resp.StatusCode, truncate(string(raw), 200))
+		return nil, fmt.Errorf("jmap session: HTTP %d: %s", resp.StatusCode, c.redact(truncate(string(raw), 200)))
 	}
 	var s Session
 	if err := json.Unmarshal(raw, &s); err != nil {
@@ -173,7 +175,7 @@ func (c *JMAP) Request(ctx context.Context, account string, calls ...Invocation)
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("jmap: HTTP %d: %s", resp.StatusCode, truncate(string(raw), 300))
+		return nil, fmt.Errorf("jmap: HTTP %d: %s", resp.StatusCode, c.redact(truncate(string(raw), 300)))
 	}
 	var envelope struct {
 		MethodResponses []Invocation `json:"methodResponses"`
@@ -217,7 +219,7 @@ func (c *JMAP) UploadBlob(ctx context.Context, account, accountID, contentType s
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("jmap upload: HTTP %d: %s", resp.StatusCode, truncate(string(raw), 200))
+		return "", fmt.Errorf("jmap upload: HTTP %d: %s", resp.StatusCode, c.redact(truncate(string(raw), 200)))
 	}
 	var out struct {
 		BlobID string `json:"blobId"`
@@ -258,6 +260,29 @@ func (c *JMAP) DownloadBlob(ctx context.Context, account, accountID, blobID, nam
 func truncate(s string, n int) string {
 	if len(s) > n {
 		return s[:n]
+	}
+	return s
+}
+
+// credentialPattern matches HTTP authorization material that a mail-store
+// response could echo back at us (some servers and proxies include the
+// request in their error bodies).
+var credentialPattern = regexp.MustCompile(`(?i)(basic|bearer)\s+[A-Za-z0-9+/=._~-]+`)
+
+// redact scrubs an untrusted upstream response before it is embedded in an
+// error message or a log line. Error strings travel into logs, audit detail
+// and operator-facing diagnostics, so anything that could carry the master
+// credential must be removed at the boundary — not at each call site.
+func (c *JMAP) redact(s string) string {
+	s = credentialPattern.ReplaceAllString(s, "$1 [redacted]")
+	if c.MasterSecret != "" {
+		s = strings.ReplaceAll(s, c.MasterSecret, "[redacted]")
+		// Also the base64 form, in case only the encoded pair is echoed.
+		for _, user := range []string{c.MasterUser, ""} {
+			pair := user + ":" + c.MasterSecret
+			enc := base64.StdEncoding.EncodeToString([]byte(pair))
+			s = strings.ReplaceAll(s, enc, "[redacted]")
+		}
 	}
 	return s
 }
