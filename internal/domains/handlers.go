@@ -6,7 +6,6 @@
 package domains
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
@@ -32,14 +31,13 @@ type Handlers struct {
 	DNSChecker   *dnscheck.Checker
 	MailHostname string
 	OutboundIP   string
-	// DKIM reports the domain's active selector/public key for the DKIM
-	// record check; nil until DKIM key management is wired.
-	DKIM func(ctx context.Context, domainID string) (selector, publicKey string)
 }
 
 type Domain struct {
 	ID                 string  `json:"id"`
 	OrganizationID     string  `json:"organization_id"`
+	ProjectID          *string `json:"project_id,omitempty"`
+	ProjectName        string  `json:"project_name,omitempty"`
 	Name               string  `json:"name"`
 	Status             string  `json:"status"`
 	VerificationMode   string  `json:"verification_mode"`
@@ -53,16 +51,19 @@ type Domain struct {
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id := auth.IdentityFrom(r.Context())
 	query := `
-		SELECT id, organization_id, name, status, verification_mode,
-		       provisioning_status, provisioning_error, provisioned_at::text,
-		       created_at::text
-		FROM domains WHERE tenant_id = $1`
+		SELECT d.id, d.organization_id, d.project_id, COALESCE(p.name, ''),
+		       d.name, d.status, d.verification_mode,
+		       d.provisioning_status, d.provisioning_error, d.provisioned_at::text,
+		       d.created_at::text
+		FROM domains d
+		LEFT JOIN projects p ON p.id = d.project_id
+		WHERE d.tenant_id = $1`
 	args := []any{id.TenantID}
 	if !id.TenantWide() {
-		query += ` AND organization_id = $2`
+		query += ` AND d.organization_id = $2`
 		args = append(args, id.OrganizationID)
 	}
-	query += ` ORDER BY created_at`
+	query += ` ORDER BY d.created_at`
 	rows, err := h.Pool.Query(r.Context(), query, args...)
 	if err != nil {
 		h.Log.Error("domain list failed", slog.String("error", err.Error()))
@@ -73,7 +74,8 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	out := []Domain{}
 	for rows.Next() {
 		var d Domain
-		if err := rows.Scan(&d.ID, &d.OrganizationID, &d.Name, &d.Status, &d.VerificationMode,
+		if err := rows.Scan(&d.ID, &d.OrganizationID, &d.ProjectID, &d.ProjectName,
+			&d.Name, &d.Status, &d.VerificationMode,
 			&d.ProvisioningStatus, &d.ProvisioningError, &d.ProvisionedAt, &d.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
@@ -85,6 +87,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 
 type createRequest struct {
 	OrganizationID   string `json:"organization_id"`
+	ProjectID        string `json:"project_id"`
 	Name             string `json:"name"`
 	VerificationMode string `json:"verification_mode"`
 }
@@ -131,6 +134,22 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusNotFound, "ORGANIZATION_NOT_FOUND", "Organization not found")
 		return
 	}
+	// Domain ownership (§80): the domain attaches to a project of its
+	// organization — an explicit one, or the organization's Default project.
+	var projectID *string
+	if req.ProjectID != "" {
+		if err := h.Pool.QueryRow(r.Context(), `
+			SELECT id FROM projects
+			WHERE id = $1 AND organization_id = $2 AND status = 'active'`,
+			req.ProjectID, orgID).Scan(&projectID); err != nil {
+			httpx.Error(w, r, http.StatusNotFound, "PROJECT_NOT_FOUND", "Project not found in this organization")
+			return
+		}
+	} else {
+		_ = h.Pool.QueryRow(r.Context(), `
+			SELECT id FROM projects WHERE organization_id = $1 AND slug = 'default'`,
+			orgID).Scan(&projectID)
+	}
 
 	status := "pending"
 	if mode == "development" {
@@ -138,12 +157,12 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	var d Domain
 	err = h.Pool.QueryRow(r.Context(), `
-		INSERT INTO domains (tenant_id, organization_id, name, status, verification_mode, verification_token)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO domains (tenant_id, organization_id, project_id, name, status, verification_mode, verification_token)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (name) DO NOTHING
-		RETURNING id, organization_id, name, status, verification_mode, created_at::text`,
-		id.TenantID, orgID, name, status, mode, newVerificationToken()).
-		Scan(&d.ID, &d.OrganizationID, &d.Name, &d.Status, &d.VerificationMode, &d.CreatedAt)
+		RETURNING id, organization_id, project_id, name, status, verification_mode, created_at::text`,
+		id.TenantID, orgID, projectID, name, status, mode, newVerificationToken()).
+		Scan(&d.ID, &d.OrganizationID, &d.ProjectID, &d.Name, &d.Status, &d.VerificationMode, &d.CreatedAt)
 	if err != nil {
 		httpx.Error(w, r, http.StatusConflict, "DOMAIN_EXISTS", "This domain is already registered")
 		return

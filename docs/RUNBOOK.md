@@ -93,18 +93,53 @@ Admin → Domains / Mailboxes shows `Failed` with the stored error.
 
 ## DKIM missing / failing
 
-Not implemented yet — the mail core logs `DKIM signer not found` for
-outbound mail and no key is provisioned. Outbound mail is therefore
-unsigned, which foreign providers may treat as suspicious. Tracked as a
-gap; see PROJECT_STATUS.
+Every provisioned domain gets an RSA signing key automatically (Admin →
+Domains → open a domain → **DKIM**). Outbound mail is signed by the mail
+core with the active selector.
+
+1. **Verify the key is published**: the DKIM tab shows the selector, host
+   (`<selector>._domainkey.<domain>`) and TXT value with a Copy button.
+   Publish that record, then run Admin → Domains → DNS → **Recheck DNS**;
+   the DKIM row turns Verified when the published key matches.
+2. **Prove signing works** without the public internet:
+   `make sink-up`, send to `ok-…@sink.test`, then
+   `docker exec mailplatform-smtpsink tail -1 /data/sink.jsonl` — the
+   `raw` field contains the `DKIM-Signature:` header. Verify it
+   cryptographically:
+   `go run ./cmd/dkimverify -domain <domain> -selector <selector> -pubkey <p-value>`
+   (feed the raw message on stdin). Exit 0 = valid signature.
+3. **Rotation**: DKIM tab → Rotate. The new key becomes active immediately;
+   the previous key moves to `previous` with a `retire_after` date — keep
+   its DNS record until then so in-flight mail still verifies.
+4. If the mail core still logs `DKIM signer not found`, the settings did
+   not reload: the signature id must be `rsa-<domain>` / `ed25519-<domain>`
+   (the ids Stalwart's default rule looks up). `EnsureDKIMKey` sets this and
+   calls `/api/reload`.
+
+The DKIM **private key never leaves the mail core** — it is not stored in
+PostgreSQL, logs, audit entries or any API response (only the public key
+is). This is enforced by `internal/mailcore` redaction and covered by
+`internal/mailcore/redaction_test.go`.
 
 ## Rspamd / ClamAV unavailable
 
-Not deployed yet. Inbound classification currently comes from Stalwart's
-built-in spam filter (SPF/DKIM/DMARC/IPREV evaluation), plus the platform's
-own deterministic risk engine on the acceptance path. When the external
-scanners are introduced, their failure policy must be written into an ADR
-first (fail-open vs fail-closed vs defer) rather than chosen implicitly.
+Inbound mail is scanned by Rspamd (milter, DATA stage) with ClamAV behind
+it; the control-plane acceptance path also scans through Rspamd's HTTP API.
+Failure policy is fixed in `docs/adr/ADR-004-rspamd-clamav.md`:
+
+- **Rspamd down** → fail-open: Stalwart's built-in filter still runs; mail
+  flows. Health shows `rspamd: unavailable` (Admin → Infrastructure).
+- **ClamAV down** → fail-closed as a deferral: inbound mail with
+  attachments gets a 451 (retryable); control-plane mail with attachments
+  is held `pending_scan` and released automatically when scanning recovers.
+  Unscanned attachments are never delivered.
+- **Malware detected** → rejected at SMTP (554) for inbound; quarantined
+  (reason `malware`) for control-plane mail.
+
+Restart a scanner with `docker compose up -d rspamd` / `clamav`. ClamAV's
+first start downloads its signature database (minutes); its healthcheck
+reports ready only when `clamd` accepts connections, so
+`clamav: unavailable` right after start is normal (alive vs ready).
 
 ## Legacy mail migration
 

@@ -250,12 +250,31 @@ if docker exec -i "$PG_CONTAINER" psql -q -U "$PG_USER" -d "$PG_DB" -c "$SQL" >/
     [ "$st" = "404" ] && pass "tenant B cannot download tenant A attachment" || fail "cross-tenant attachment ($st)"
     curl -s "$API/api/v1/users" -H "Authorization: Bearer $TB" | grep -q "$A1" \
       && fail "tenant B sees tenant A users" || pass "tenant B cannot list tenant A users"
+
+    # --- V4 §194: organization isolation on the new control-plane surfaces ---
+    curl -s "$API/api/v1/domains" -H "Authorization: Bearer $TB" | grep -q "$DOMAIN" \
+      && fail "org B sees org A domains" || pass "org B cannot list org A domains"
+    st=$(code GET "/api/v1/domains/$DOM_ID/dns" "$TB")
+    [ "$st" = "404" ] && pass "org B cannot read org A domain DNS" || fail "cross-org DNS ($st)"
+    st=$(code GET "/api/v1/domains/$DOM_ID/dkim" "$TB")
+    [ "$st" = "404" ] && pass "org B cannot read org A DKIM keys" || fail "cross-org DKIM ($st)"
+    st=$(code POST "/api/v1/domains/$DOM_ID/dkim/rotate" "$TB")
+    [ "$st" = "404" ] && pass "org B cannot rotate org A DKIM" || fail "cross-org DKIM rotate ($st)"
+    # Queue is platform-wide infrastructure: an org-scoped admin is refused.
+    st=$(code GET "/api/v1/admin/queue" "$TB")
+    [ "$st" = "403" ] && pass "org-scoped admin cannot open the queue" || fail "queue org-scope ($st)"
   else
     fail "tenant B login"
   fi
 else
   fail "tenant B seed via psql"
 fi
+
+# --- V4 §121: a regular USER cannot reach admin operational surfaces ---
+for path in "/api/v1/quarantine" "/api/v1/admin/queue" "/api/v1/admin/deliverability" "/api/v1/system/infrastructure"; do
+  st=$(code GET "$path" "$T1")
+  [ "$st" = "403" ] && pass "user denied $path" || fail "user reached $path ($st)"
+done
 
 # --- 9. Webhooks (requires node) --------------------------------------------
 if command -v node >/dev/null 2>&1; then
@@ -373,6 +392,29 @@ case "$prov" in
   failed) fail "domain provisioning failed (mail core down during e2e?)" ;;
   *) fail "domain provisioning status ($prov)" ;;
 esac
+
+# --- 13b. V4 DNS verification subsystem (§190) -------------------------------
+DNS_JSON=$(curl -s "$API/api/v1/domains/$DOM_ID/dns" -H "Authorization: Bearer $ADM")
+for rt in ownership mx spf dkim dmarc ptr; do
+  printf '%s' "$DNS_JSON" | grep -q "\"type\":\"$rt\"" \
+    && pass "dns snapshot has $rt record" || fail "dns snapshot missing $rt"
+done
+RECHECK=$(curl -s -X POST "$API/api/v1/domains/$DOM_ID/dns/recheck" -H "Authorization: Bearer $ADM")
+printf '%s' "$RECHECK" | grep -q '"status":' \
+  && pass "dns recheck classifies records" || fail "dns recheck returned no statuses"
+
+# --- 13c. V4 DKIM (§189) ----------------------------------------------------
+# DKIM is auto-generated when a domain is provisioned into the mail core.
+if [ "$prov" = "active" ]; then
+  DKIM_JSON=$(curl -s "$API/api/v1/domains/$DOM_ID/dkim" -H "Authorization: Bearer $ADM")
+  printf '%s' "$DKIM_JSON" | grep -q '"status":"active"' \
+    && pass "domain has an active DKIM key after provisioning" || fail "no active DKIM key"
+  printf '%s' "$DKIM_JSON" | grep -q '"public_key":"[A-Za-z0-9]' \
+    && pass "DKIM key exposes a public key" || fail "DKIM public key missing"
+  # The private key must never reach the browser (§197).
+  printf '%s' "$DKIM_JSON" | grep -qi "PRIVATE KEY" \
+    && fail "DKIM response leaks a private key" || pass "DKIM response carries no private key"
+fi
 
 # --- 14. Unified mail store: webmail id is the mail-store id ------------------
 # The message A1 sent to A2 must be reachable by the same identifier through

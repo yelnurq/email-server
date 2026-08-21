@@ -60,8 +60,8 @@ func (h *Handlers) domainForDNS(ctx context.Context, id *auth.Identity, domainID
 	return name, mode, status, token, true
 }
 
-// expectations assembles what DNS should contain for the domain. DKIM data
-// arrives when key generation exists (V4 DKIM phase) via the DKIM hook.
+// expectations assembles what DNS should contain for the domain, including
+// the active DKIM key registered for it (public material only).
 func (h *Handlers) expectations(ctx context.Context, domainID, name, token string) dnscheck.Expectations {
 	e := dnscheck.Expectations{
 		Domain:         name,
@@ -69,9 +69,13 @@ func (h *Handlers) expectations(ctx context.Context, domainID, name, token strin
 		OutboundIP:     h.OutboundIP,
 		OwnershipToken: token,
 	}
-	if h.DKIM != nil {
-		e.DKIMSelector, e.DKIMPublicKey = h.DKIM(ctx, domainID)
-	}
+	// No row is fine (key not generated yet) — the DKIM check reports
+	// pending in that case.
+	_ = h.Pool.QueryRow(ctx, `
+		SELECT selector, public_key FROM dkim_keys
+		WHERE domain_id = $1 AND status = 'active'
+		ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
+		domainID).Scan(&e.DKIMSelector, &e.DKIMPublicKey)
 	return e
 }
 

@@ -164,10 +164,66 @@ export function formatBytes(n: number): string {
 }
 
 export type Organization = { id: string; name: string; slug: string; status: string; created_at: string };
+export type Project = {
+  id: string; organization_id: string; name: string; slug: string;
+  status: string; domains: number; created_at: string;
+};
 export type Domain = {
-  id: string; organization_id: string; name: string; status: string;
+  id: string; organization_id: string; project_id?: string; project_name?: string;
+  name: string; status: string;
   verification_mode: string; created_at: string;
   provisioning_status: string; provisioning_error?: string; provisioned_at?: string;
+};
+
+// ---- DNS verification (V4) ----
+export type DnsStatus = "verified" | "missing" | "invalid" | "warning" | "pending" | "dns_error";
+export type DnsCheck = {
+  type: string; host: string; expected: string; detected: string[] | null;
+  status: DnsStatus; detail?: string; checked_at: string;
+};
+export type DomainDns = {
+  domain_id: string; domain: string; verification_mode: string; status: string;
+  verification_token: string; checked_at?: string; records: DnsCheck[];
+};
+
+// ---- DKIM (V4) ----
+export type DkimKey = {
+  id: string; selector: string; algorithm: string; status: string;
+  public_key: string; dns_host: string; dns_value: string;
+  created_at: string; activated_at?: string; retire_after?: string;
+};
+
+// ---- Queue Center (V4) ----
+export type QueueRecipient = {
+  address: string; queue: string; status: string; status_detail?: string;
+  retry_num: number; next_retry?: string; next_notify?: string; expires?: string;
+};
+export type QueueMessage = {
+  id: string; return_path: string; created: string; size: number;
+  recipients: QueueRecipient[];
+};
+export type QueueSummary = {
+  total: number; scheduled: number; deferred: number; retrying: number;
+  oldest_queued?: string; next_retry?: string; listed: number;
+};
+export type QueueView = { summary: QueueSummary; messages: QueueMessage[] };
+
+// ---- Deliverability (V4) ----
+export type Deliverability = {
+  range: string;
+  totals: { accepted: number; delivered_local: number; relayed: number; failed: number; quarantined: number };
+  top_failures: Array<{ error: string; count: number }> | null;
+  providers?: Array<{ provider: string; domains: number; relayed: number; failed: number }>;
+  series: Array<{ bucket: string; accepted: number; delivered_local: number; relayed: number; failed: number }>;
+  queue?: { total: number; deferred: number };
+  definitions: Record<string, string>;
+};
+
+// ---- Quarantine (V4) ----
+export type QuarantineItem = {
+  id: string; message_id: string; from: string; subject: string;
+  recipient_address: string; reason: string; signals: string[];
+  risk_score: number; status: string; created_at: string;
 };
 export type AdminUser = {
   id: string; organization_id?: string; email: string; display_name: string;

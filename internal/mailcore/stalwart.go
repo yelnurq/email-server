@@ -53,9 +53,50 @@ func (e *apiError) Error() string {
 	return fmt.Sprintf("stalwart api: HTTP %d %s: %s", e.Status, e.Code, e.Body)
 }
 
+// redactBody reduces an upstream error body to its secret-free parts.
+// Stalwart error envelopes can echo submitted values verbatim — observed
+// live on v0.13.4: fieldAlreadyExists returns the full private-key PEM in
+// its "value" field, and principal errors could echo "$app$…$password"
+// secrets the same way. Only error code, field and item names survive into
+// error strings, logs, provisioning_error columns and audit details;
+// values never do (V4 §120).
+func redactBody(raw []byte) string {
+	var env struct {
+		Error   string `json:"error"`
+		Field   string `json:"field"`
+		Item    string `json:"item"`
+		Reason  string `json:"reason"`
+		Details string `json:"details"`
+	}
+	if json.Unmarshal(raw, &env) == nil && env.Error != "" {
+		out := "error=" + env.Error
+		if env.Field != "" {
+			out += " field=" + env.Field
+		}
+		if env.Item != "" {
+			out += " item=" + env.Item
+		}
+		for _, extra := range []string{env.Reason, env.Details} {
+			if extra != "" && !strings.Contains(extra, "-----BEGIN") && len(extra) <= 200 {
+				out += " " + extra
+			}
+		}
+		return out
+	}
+	s := strings.TrimSpace(string(raw))
+	if strings.Contains(s, "-----BEGIN") || strings.Contains(s, "$app$") {
+		return "[redacted: upstream error body carried credential material]"
+	}
+	if len(s) > 300 {
+		s = s[:300] + "…"
+	}
+	return s
+}
+
 // do executes one management call. Transport failures wrap ErrUnavailable;
-// HTTP-level and body-level errors come back as *apiError with the response
-// body (Stalwart error bodies are short JSON descriptions, never secrets).
+// HTTP-level and body-level errors come back as *apiError whose Body has
+// been passed through redactBody — the raw upstream body never reaches
+// error strings or logs.
 func (s *Stalwart) do(ctx context.Context, method, path string, body any, out any) error {
 	var rd io.Reader
 	if body != nil {
@@ -80,13 +121,13 @@ func (s *Stalwart) do(ctx context.Context, method, path string, body any, out an
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return &apiError{Status: resp.StatusCode, Body: strings.TrimSpace(string(raw))}
+		return &apiError{Status: resp.StatusCode, Body: redactBody(raw)}
 	}
 	var envelope struct {
 		Error string `json:"error"`
 	}
 	if json.Unmarshal(raw, &envelope) == nil && envelope.Error != "" {
-		return &apiError{Status: resp.StatusCode, Code: envelope.Error, Body: strings.TrimSpace(string(raw))}
+		return &apiError{Status: resp.StatusCode, Code: envelope.Error, Body: redactBody(raw)}
 	}
 	if out != nil {
 		return json.Unmarshal(raw, out)
@@ -279,4 +320,63 @@ func (s *Stalwart) RemoveAppPassword(ctx context.Context, email, label string) e
 		return nil
 	}
 	return err
+}
+
+// dkimSignatureID is the settings id Stalwart's default signing rule looks
+// up for outbound mail: 'rsa-' + sender_domain / 'ed25519-' + sender_domain
+// (verified live on v0.13.4 — the "DKIM signer not found" warning names
+// exactly these ids). Using them means signing needs no auth.dkim.sign
+// override in the config.
+func dkimSignatureID(domain, algorithm string) string {
+	return algorithm + "-" + domain
+}
+
+// EnsureDKIMKey has the mail core generate a signing key for the domain and
+// returns its base64 public key. Posting the same id again (rotation)
+// replaces the key material and selector in place.
+//
+// SECURITY (V4 §22): the private key is created inside the mail core and
+// never read back here. GET /api/dkim/{id} returns only the public key.
+// Product code must never call /api/settings/list with a "signature."
+// prefix — that response would include private key PEMs.
+func (s *Stalwart) EnsureDKIMKey(ctx context.Context, domain, selector, algorithm string) (string, error) {
+	algo := strings.ToLower(algorithm)
+	var apiAlgo string
+	switch algo {
+	case "rsa":
+		apiAlgo = "Rsa"
+	case "ed25519":
+		apiAlgo = "Ed25519"
+	default:
+		return "", fmt.Errorf("unsupported DKIM algorithm %q", algorithm)
+	}
+	id := dkimSignatureID(domain, algo)
+	// Rotation: Stalwart refuses to overwrite an existing signature id
+	// (fieldAlreadyExists, verified live), so clear its settings first.
+	// Clearing a non-existent prefix is a no-op.
+	if err := s.do(ctx, http.MethodPost, "/api/settings", []map[string]string{
+		{"type": "clear", "prefix": "signature." + id + "."},
+	}, nil); err != nil {
+		return "", err
+	}
+	if err := s.do(ctx, http.MethodPost, "/api/dkim", map[string]any{
+		"id": id, "algorithm": apiAlgo, "domain": domain, "selector": selector,
+	}, nil); err != nil {
+		return "", err
+	}
+	var pub struct {
+		Data string `json:"data"`
+	}
+	if err := s.do(ctx, http.MethodGet, "/api/dkim/"+id, nil, &pub); err != nil {
+		return "", err
+	}
+	if pub.Data == "" {
+		return "", fmt.Errorf("mail core returned an empty DKIM public key for %s", id)
+	}
+	// Apply live: settings changes take effect after a config reload
+	// (GET /api/reload, verified live on v0.13.4).
+	if err := s.do(ctx, http.MethodGet, "/api/reload", nil, nil); err != nil {
+		return "", err
+	}
+	return pub.Data, nil
 }

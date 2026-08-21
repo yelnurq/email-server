@@ -119,11 +119,18 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
+	// Project scope (§86): the credential inherits the project of the
+	// mailbox's domain — SMTP credentials always act within that scope.
+	var projectID *string
+	_ = tx.QueryRow(r.Context(), `
+		SELECT d.project_id FROM mailboxes m
+		JOIN domains d ON d.id = m.domain_id
+		WHERE m.id = $1`, req.MailboxID).Scan(&projectID)
 	var credID string
 	if err := tx.QueryRow(r.Context(), `
-		INSERT INTO smtp_credentials (tenant_id, organization_id, mailbox_id, username, secret_hash, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		id.TenantID, mailboxOrgID, req.MailboxID, username, hash[:], id.UserID).Scan(&credID); err != nil {
+		INSERT INTO smtp_credentials (tenant_id, organization_id, project_id, mailbox_id, username, secret_hash, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		id.TenantID, mailboxOrgID, projectID, req.MailboxID, username, hash[:], id.UserID).Scan(&credID); err != nil {
 		h.Log.Error("smtp cred create failed", slog.String("error", err.Error()))
 		httpx.Internal(w, r)
 		return

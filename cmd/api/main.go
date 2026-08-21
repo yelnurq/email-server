@@ -27,6 +27,7 @@ import (
 	"github.com/yelnurq/email-server/internal/bulkmail"
 	"github.com/yelnurq/email-server/internal/collab"
 	"github.com/yelnurq/email-server/internal/config"
+	"github.com/yelnurq/email-server/internal/deliverability"
 	"github.com/yelnurq/email-server/internal/departments"
 	"github.com/yelnurq/email-server/internal/dnscheck"
 	"github.com/yelnurq/email-server/internal/domains"
@@ -40,6 +41,8 @@ import (
 	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/official"
 	"github.com/yelnurq/email-server/internal/organization"
+	"github.com/yelnurq/email-server/internal/queueops"
+	"github.com/yelnurq/email-server/internal/scanner"
 	"github.com/yelnurq/email-server/internal/security"
 	"github.com/yelnurq/email-server/internal/server"
 	"github.com/yelnurq/email-server/internal/smtpcreds"
@@ -133,7 +136,19 @@ func run() error {
 		}
 	}
 	log.Info("mail core provider", slog.String("provider", mailCore.Name()))
+
+	// Security scanners (V4): rspamd + clamav clients for the control-plane
+	// acceptance path and infrastructure health.
+	rspamdClient := &scanner.Rspamd{BaseURL: cfg.RspamdURL, Password: cfg.RspamdPassword}
+	clamdClient := &scanner.Clamd{Addr: cfg.ClamAVAddr}
+
 	infra := &server.InfraMonitor{Health: health, Provider: mailCore, TTL: 10 * time.Second}
+	if rspamdClient.Enabled() {
+		infra.RspamdPing = rspamdClient.Ping
+	}
+	if clamdClient.Enabled() {
+		infra.ClamAVPing = clamdClient.Ping
+	}
 
 	// Unified mail store access (ADR-003): webmail reads/writes mailboxes
 	// through JMAP with master-user auth. Without a mail core the JMAP base
@@ -200,6 +215,14 @@ func run() error {
 	smtpCredHandlers := &smtpcreds.Handlers{Pool: pool, Audit: auditLog, Log: log, Provider: mailCore}
 	auditHandlers := &auditapi.Handlers{Pool: pool}
 	traceHandlers := &trace.Handlers{Pool: pool, Log: log}
+	queueHandlers := &queueops.Handlers{Audit: auditLog, Log: log}
+	if qm, ok := mailCore.(mailcore.QueueManager); ok {
+		queueHandlers.Queue = qm
+	}
+	deliverabilityHandlers := &deliverability.Handlers{
+		Pool: pool, Log: log, Queue: queueHandlers.Queue,
+		Resolver: dnscheck.NewNetResolver(cfg.DNSResolverAddr, 3*time.Second),
+	}
 	emailAPI := &emailapi.Handlers{
 		Pool: pool,
 		Keys: &apikeys.Service{Pool: pool},
@@ -221,6 +244,12 @@ func run() error {
 					Get("/organizations", orgHandlers.List)
 				admin.With(auth.RequirePermission("organizations.manage")).
 					Post("/organizations", orgHandlers.Create)
+				admin.With(auth.RequirePermission("organizations.manage")).
+					Get("/organizations/{id}/projects", orgHandlers.ListProjects)
+				admin.With(auth.RequirePermission("organizations.manage")).
+					Post("/organizations/{id}/projects", orgHandlers.CreateProject)
+				admin.With(auth.RequirePermission("organizations.manage")).
+					Patch("/projects/{id}", orgHandlers.PatchProject)
 
 				admin.With(auth.RequirePermission("domains.manage")).
 					Get("/domains", domainHandlers.List)
@@ -232,6 +261,10 @@ func run() error {
 					Get("/domains/{id}/dns", domainHandlers.DNS)
 				admin.With(auth.RequirePermission("domains.manage")).
 					Post("/domains/{id}/dns/recheck", domainHandlers.RecheckDNS)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Get("/domains/{id}/dkim", domainHandlers.DKIMKeys)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Post("/domains/{id}/dkim/rotate", domainHandlers.RotateDKIM)
 
 				admin.With(auth.RequirePermission("users.manage")).
 					Get("/users", userHandlers.List)
@@ -309,11 +342,16 @@ func run() error {
 				admin.With(auth.RequirePermission("audit.read")).
 					Get("/audit", auditHandlers.List)
 
-				// Operational tools: Message Trace and infrastructure health.
+				// Operational tools: Message Trace, Queue Center and
+				// infrastructure health.
 				admin.Group(func(ops chi.Router) {
 					ops.Use(auth.RequirePermission("security.manage"))
 					ops.Get("/admin/messages", traceHandlers.List)
 					ops.Get("/admin/messages/{publicID}/trace", traceHandlers.Get)
+					ops.Get("/admin/queue", queueHandlers.List)
+					ops.Post("/admin/queue/{id}/retry", queueHandlers.Retry)
+					ops.Delete("/admin/queue/{id}", queueHandlers.Cancel)
+					ops.Get("/admin/deliverability", deliverabilityHandlers.Overview)
 				})
 				admin.With(auth.RequirePermission("users.manage")).
 					Get("/system/infrastructure", infra.Infrastructure)

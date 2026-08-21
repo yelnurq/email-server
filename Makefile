@@ -4,7 +4,7 @@
 # README.md, so make itself is optional on Windows.
 
 .PHONY: up down logs ps api worker migrate-up migrate-down migrate-status web web-prod \
-        migrate-mail migrate-mail-dry mail-dedupe sink-build sink-up fmt vet lint test build
+        migrate-mail migrate-mail-dry mail-dedupe sink-build sink-up scanners-up fmt vet lint test build
 
 ## Infrastructure (Docker Compose)
 up:
@@ -63,6 +63,11 @@ sink-build:
 
 sink-up: sink-build
 	docker compose --profile test up -d smtpsink
+
+# Security scanners (Rspamd + ClamAV). ClamAV's first start downloads its
+# signature database and can take several minutes to report healthy.
+scanners-up:
+	docker compose up -d rspamd clamav
 
 ## Quality
 fmt:

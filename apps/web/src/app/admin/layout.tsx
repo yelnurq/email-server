@@ -19,19 +19,14 @@ const GROUPS: Array<{ label: string; items: Array<{ href: string; label: string;
   {
     label: "organization",
     items: [
+      { href: "/admin/organizations", label: "organizations", icon: "briefcase", permission: "organizations.manage" },
       { href: "/admin/users", label: "team", icon: "users", permission: "users.manage" },
       { href: "/admin/departments", label: "departments", icon: "building", permission: "departments.manage" },
-      { href: "/admin/bulk-email", label: "Broadcast", icon: "megaphone", permission: "bulk_email.view_analytics" },
-      { href: "/admin/organizations", label: "organizations", icon: "briefcase", permission: "organizations.manage" },
-    ],
-  },
-  {
-    label: "infrastructure",
-    items: [
       { href: "/admin/domains", label: "domains", icon: "globe", permission: "domains.manage" },
       { href: "/admin/mailboxes", label: "mailboxes", icon: "mail", permission: "mailboxes.manage" },
       { href: "/admin/aliases", label: "aliases", icon: "at-sign", permission: "mailboxes.manage" },
       { href: "/admin/groups", label: "groups", icon: "users", permission: "mailboxes.manage" },
+      { href: "/admin/bulk-email", label: "Broadcast", icon: "megaphone", permission: "bulk_email.view_analytics" },
     ],
   },
   {
@@ -46,14 +41,22 @@ const GROUPS: Array<{ label: string; items: Array<{ href: string; label: string;
     label: "operations",
     items: [
       { href: "/admin/trace", label: "messageTrace", icon: "search", permission: "security.manage" },
-      { href: "/admin/infrastructure", label: "infrastructureHealth", icon: "activity", permission: "users.manage" },
+      { href: "/admin/queue", label: "Queue", icon: "layers", permission: "security.manage" },
+      { href: "/admin/deliverability", label: "Deliverability", icon: "trending-up", permission: "security.manage" },
     ],
   },
   {
     label: "security",
     items: [
       { href: "/admin/security", label: "securityCenter", icon: "shield", permission: "security.manage" },
+      { href: "/admin/quarantine", label: "Quarantine", icon: "shield-alert", permission: "security.manage" },
       { href: "/admin/audit", label: "Logs & Audit", icon: "scroll-text", permission: "audit.read" },
+    ],
+  },
+  {
+    label: "infrastructure",
+    items: [
+      { href: "/admin/infrastructure", label: "infrastructureHealth", icon: "activity", permission: "users.manage" },
     ],
   },
 ];

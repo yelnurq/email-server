@@ -62,6 +62,8 @@ type Worker struct {
 	Log   *slog.Logger
 	Mail  *mailservice.Service
 	Store storage.ObjectStore
+	// Scan is the security engine (deterministic rules + Rspamd/ClamAV).
+	Scan *security.Engine
 }
 
 // Run subscribes the durable consumer and blocks until ctx is cancelled.
@@ -237,21 +239,24 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	_ = tx.QueryRow(ctx,
 		`SELECT organization_id FROM mailboxes WHERE address = $1`, fromAddress).Scan(&senderOrgID)
 
-	// Security verdict decides inbox / junk folder / quarantine.
-	verdict, err := security.Evaluate(ctx, tx, p.TenantID, fromAddress, subject, bodyText)
-	if err != nil {
-		return err
-	}
-	targetFolder := "inbox"
-	if verdict.Action == security.ActionSpam {
-		targetFolder = "spam"
-	}
-
 	// Canonical RFC822 bytes: identical for every local copy, the Sent copy
-	// and the outbound relay.
+	// and the outbound relay — and the input for the security scan.
 	raw, err := mailservice.RenderMessage(ctx, tx, w.Store, p.MessageID)
 	if err != nil {
 		return err
+	}
+
+	// Security verdict decides inbox / junk folder / quarantine. A scan
+	// deferral (attachments present, no malware scanner reachable) is a
+	// transient error: the delivery retries with backoff per ADR-004.
+	verdict, err := w.Scan.Evaluate(ctx, tx, p.TenantID, fromAddress, subject, bodyText, raw)
+	if err != nil {
+		return err
+	}
+	w.recordScan(ctx, tx, p.MessageID, verdict)
+	targetFolder := "inbox"
+	if verdict.Action == security.ActionSpam {
+		targetFolder = "spam"
 	}
 
 	var remote []recipient
@@ -534,6 +539,32 @@ func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, addres
 	return targets, "", gRows.Err()
 }
 
+// recordScan persists the security verdict as message metadata and a trace
+// event (§41, §65). Best effort: a metadata write failure never blocks
+// delivery, and the scan event is written once per message.
+func (w *Worker) recordScan(ctx context.Context, tx pgx.Tx, messageID string, v security.Verdict) {
+	meta, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE messages SET security_scan = $2 WHERE id = $1 AND security_scan IS NULL`,
+		messageID, meta); err != nil {
+		w.Log.Warn("security scan metadata write failed", slog.String("error", err.Error()))
+		return
+	}
+	detail, _ := json.Marshal(map[string]any{
+		"score": v.Score, "action": v.Action, "signals": v.Signals,
+		"rspamd_score": v.RspamdScore, "rspamd_action": v.RspamdAction,
+	})
+	_, _ = tx.Exec(ctx, `
+		INSERT INTO message_events (message_id, type, detail)
+		SELECT $1, 'email.scanned', $2
+		WHERE NOT EXISTS (
+			SELECT 1 FROM message_events WHERE message_id = $1 AND type = 'email.scanned'
+		)`, messageID, detail)
+}
+
 // quarantineRecipient parks a recipient's copy in the security quarantine
 // instead of delivering it. Idempotent via (message_id, recipient_id).
 func (w *Worker) quarantineRecipient(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, address string, verdict security.Verdict) error {
@@ -544,13 +575,17 @@ func (w *Worker) quarantineRecipient(ctx context.Context, tx pgx.Tx, p events.Ac
 		mailboxID = &mb
 	}
 	signals, _ := json.Marshal(verdict.Signals)
+	reason := verdict.Reason
+	if reason == "" {
+		reason = strings.Join(verdict.Signals, ", ")
+	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO quarantine_items (tenant_id, message_id, recipient_id, recipient_address,
 		                              mailbox_id, reason, signals, risk_score)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (message_id, recipient_id) DO NOTHING`,
 		p.TenantID, p.MessageID, recipientID, address, mailboxID,
-		strings.Join(verdict.Signals, ", "), signals, verdict.Score); err != nil {
+		reason, signals, verdict.Score); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `

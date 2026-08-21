@@ -1,13 +1,54 @@
 # Project Status
 
-Updated: 2026-08-20 (night, stage 2). States: VERIFIED (tested by
+Updated: 2026-08-21 (stage V4). States: VERIFIED (tested by
 command/E2E), IN PROGRESS, NOT STARTED, BLOCKED.
 
-Automated gate: `scripts/e2e.sh` — **60 checks, all passing** (on Windows:
+Automated gate: `scripts/e2e.sh` — **79 checks, all passing** (on Windows:
 `scripts/e2e.ps1` runs the same suite in a docker:cli container attached to
 the compose network) — plus Go unit tests, `gofmt`/`go vet`, `tsc`,
 `eslint`, `next build`, and restart persistence checks (compose services and
 Stalwart).
+
+## V4 — Mail Security, DNS, DKIM, Deliverability, Multi-tenant (VERIFIED)
+
+- **Data integrity**: `mailaddr.NormalizeMessageID` is the single canonical
+  form (bare, domain-lowercased) used at every store boundary, MIME render,
+  migration and threading site (migration 00019 canonicalized stored rows).
+  `cmd/migrate-mail` is crash-safe/idempotent — a crash between a store
+  import and the PostgreSQL stamp leaves exactly one logical copy, proven by
+  `cmd/migrate-mail/main_test.go` (crash, page-beyond-100, repeated-run).
+  Delivery, the Sent copy and quarantine release all pre-check Message-ID.
+- **DNS** (`internal/dnscheck`): MX/SPF/DKIM/DMARC/PTR (forward-confirmed)/
+  MTA-STS/TLS-RPT/ownership with a six-state model (verified/missing/invalid/
+  warning/pending/dns_error); transient failures never read as missing.
+  Per-domain snapshot (migration 00020), Recheck endpoint, dns-mode domains
+  provisioned only after ownership+MX verify.
+- **DKIM**: RSA key auto-generated per domain in the mail core on
+  provisioning; outbound mail is really signed (verified cryptographically
+  with `cmd/dkimverify`). Rotation (active/previous/retire_after, migration
+  00021). Private key never leaves the mail core (redaction test).
+- **Rspamd + ClamAV**: containers + config in `deploy/rspamd`, milter into
+  Stalwart, control-plane HTTP scan (`internal/scanner`). Failure policy in
+  ADR-004 (spam fail-open, malware fail-closed/defer). EICAR rejected at
+  SMTP; GTUBE/spoofed mail filed to Junk.
+- **Quarantine**: reasons (spam/malware/policy), states
+  pending/pending_scan/released/deleted (migration 00022), release is
+  crash-safe and audited, safe metadata-only preview UI.
+- **Queue Center**: `internal/queueops` over the Stalwart queue API (list/
+  detail/retry/cancel), sanitized verbatim SMTP replies, audited actions.
+- **Deliverability**: `internal/deliverability` — real event counts,
+  accepted vs delivered-local vs relayed kept distinct, provider breakdown
+  by MX, time series, top failures.
+- **Organizations/Projects**: Project layer (migration 00024) with a
+  Default-project migration for existing installs; domains/API keys/SMTP
+  creds carry project scope. Org isolation + USER RBAC on all new surfaces
+  covered by E2E.
+- **Production profile**: `docker-compose.prod.yml` (standard ports, mounted
+  TLS, no dev-default secrets) + `APP_ENV=production` startup validation that
+  refuses default passwords, self-signed TLS and non-https app URLs.
+- Open-relay denied (550), spoof detection, secret-leak tests: all VERIFIED.
+- **NOT verified**: public-internet delivery (no public IP/PTR/port 25) —
+  everything above is controlled-environment only.
 
 ## VERIFIED
 
@@ -131,15 +172,16 @@ audit — all RBAC-guarded
 
 ## NOT STARTED (deliberately deferred, with reasons)
 
-- DKIM signing — the mail core logs `DKIM signer not found`; outbound mail
-  is unsigned. Needs key provisioning + storage design (P1)
-- DNS verification (MX/SPF/DKIM/DMARC checks) — needs the internet phase for
-  real records; `dns`-mode domains stay pending by design
-- Rspamd / ClamAV — inbound classification currently comes from Stalwart's
-  built-in filter plus our deterministic risk engine. Their failure policy
-  (fail-open / fail-closed / defer) must be fixed in an ADR before wiring
-- Queue Center and Deliverability UI — the data exists (mail-core queue API,
-  message events); the admin surfaces are not built
+- IP Pool Manager / outbound IP model, reputation scoring, IP warmup —
+  meaningful only with real public sending IPs (internet phase)
+- Admin MFA — foundation not built this stage; production blocker, use a
+  vetted TOTP library (do not hand-roll)
+- Webhooks for the new delivery/security events (sent/deferred/bounced/
+  quarantined) — the webhook engine exists (V2); wiring the new event types
+  through it is the follow-up
+- DKIM previous-key pruning after retire_after (rotation foundation only)
+- Vault/KMS secret backend — transitional storage documented; DKIM private
+  keys currently live only inside the mail core's own store
 - Public-internet delivery — never exercised: no public IP, no port 25
   ingress, no PTR. Everything above is controlled-environment only
 - Rspamd/ClamAV integration — after mail core bridge; risk engine already

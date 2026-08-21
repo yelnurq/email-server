@@ -275,6 +275,37 @@ const PATHS: Record<string, React.ReactNode> = {
   ),
   circle: <circle cx="12" cy="12" r="9" />,
   dot: <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />,
+  layers: (
+    <>
+      <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+    </>
+  ),
+  "trending-up": (
+    <>
+      <path d="M22 7 13.5 15.5 8.5 10.5 2 17" />
+      <path d="M16 7h6v6" />
+    </>
+  ),
+  "shield-alert": (
+    <>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="M12 8v4M12 16h.01" />
+    </>
+  ),
+  "rotate-cw": (
+    <>
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+      <path d="M21 3v5h-5" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
+  play: <path d="m6 3 14 9-14 9V3Z" />,
 };
 
 export function Icon({

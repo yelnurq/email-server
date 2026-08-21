@@ -1,0 +1,60 @@
+# Production override (V4 §90-98). Apply on top of the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What it changes vs. local development:
+#   - standard mail/web ports (25, 587, 465, 993, 443) instead of the
+#     shifted development ports;
+#   - mounts real TLS certificates into the mail core (no self-signed
+#     fallback — the control plane refuses to start with
+#     STALWART_INSECURE_TLS=true when APP_ENV=production);
+#   - no dev-default passwords: every secret comes from the environment with
+#     NO fallback, so a missing secret fails the deploy instead of silently
+#     using a known value.
+#
+# Secrets are NOT stored in this file. Provide them via a root-owned .env or
+# your orchestrator's secret store. Firewall requirements are documented in
+# docs/RUNBOOK.md (Production readiness).
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD}
+    ports: []            # not published; reached over the internal network only
+
+  redis:
+    ports: []
+
+  minio:
+    environment:
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set a strong S3_SECRET_KEY}
+    ports: []
+
+  stalwart:
+    environment:
+      STALWART_ADMIN_SECRET: ${STALWART_ADMIN_PASSWORD:?set STALWART_ADMIN_PASSWORD}
+      STALWART_MASTER_SECRET: ${STALWART_MASTER_PASSWORD:?set STALWART_MASTER_PASSWORD}
+    ports:
+      - "25:25"          # inbound SMTP + server-to-server STARTTLS
+      - "587:587"        # submission (STARTTLS)
+      - "465:465"        # submission (implicit TLS)
+      - "993:993"        # IMAPS
+      # The management/JMAP HTTP port is intentionally NOT published to the
+      # internet; the Go control plane reaches it over the internal network.
+    volumes:
+      - stalwartdata:/opt/stalwart
+      - ./deploy/stalwart/config.toml:/opt/stalwart/etc/config.toml:ro
+      # Real certificate + key, mounted read-only. Point config.toml's TLS
+      # section at these paths.
+      - ${TLS_CERT_PATH:?set TLS_CERT_PATH}:/opt/stalwart/etc/tls/fullchain.pem:ro
+      - ${TLS_KEY_PATH:?set TLS_KEY_PATH}:/opt/stalwart/etc/tls/privkey.pem:ro
+
+  rspamd:
+    ports: []            # controller reached over the internal network only
+    volumes:
+      - ./deploy/rspamd/local.d:/etc/rspamd/local.d:ro
+      - ./deploy/rspamd/prod.d:/etc/rspamd/override.d:ro   # strong controller password
+      - rspamddata:/var/lib/rspamd
+
+  clamav:
+    ports: []

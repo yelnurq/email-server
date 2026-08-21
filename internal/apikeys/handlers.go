@@ -23,6 +23,8 @@ type Handlers struct {
 type keyView struct {
 	ID             string   `json:"id"`
 	OrganizationID string   `json:"organization_id"`
+	ProjectID      *string  `json:"project_id,omitempty"`
+	ProjectName    string   `json:"project_name,omitempty"`
 	Name           string   `json:"name"`
 	Prefix         string   `json:"prefix"`
 	Scopes         []string `json:"scopes"`
@@ -36,15 +38,18 @@ type keyView struct {
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id := auth.IdentityFrom(r.Context())
 	query := `
-		SELECT id, organization_id, name, prefix, scopes, status,
-		       expires_at::text, last_used_at::text, created_at::text
-		FROM api_keys WHERE tenant_id = $1`
+		SELECT k.id, k.organization_id, k.project_id, COALESCE(p.name, ''),
+		       k.name, k.prefix, k.scopes, k.status,
+		       k.expires_at::text, k.last_used_at::text, k.created_at::text
+		FROM api_keys k
+		LEFT JOIN projects p ON p.id = k.project_id
+		WHERE k.tenant_id = $1`
 	args := []any{id.TenantID}
 	if !id.TenantWide() {
-		query += ` AND organization_id = $2`
+		query += ` AND k.organization_id = $2`
 		args = append(args, id.OrganizationID)
 	}
-	query += ` ORDER BY created_at DESC`
+	query += ` ORDER BY k.created_at DESC`
 	rows, err := h.Pool.Query(r.Context(), query, args...)
 	if err != nil {
 		h.Log.Error("api key list failed", slog.String("error", err.Error()))
@@ -55,7 +60,8 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	out := []keyView{}
 	for rows.Next() {
 		var k keyView
-		if err := rows.Scan(&k.ID, &k.OrganizationID, &k.Name, &k.Prefix, &k.Scopes,
+		if err := rows.Scan(&k.ID, &k.OrganizationID, &k.ProjectID, &k.ProjectName,
+			&k.Name, &k.Prefix, &k.Scopes,
 			&k.Status, &k.ExpiresAt, &k.LastUsedAt, &k.CreatedAt); err != nil {
 			httpx.Internal(w, r)
 			return
@@ -68,6 +74,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 type createRequest struct {
 	Name           string   `json:"name"`
 	OrganizationID string   `json:"organization_id"`
+	ProjectID      string   `json:"project_id"`
 	Scopes         []string `json:"scopes"`
 }
 
@@ -118,13 +125,30 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Project scope (§85): an explicit project of the same organization, or
+	// the organization's Default project.
+	var projectID *string
+	if req.ProjectID != "" {
+		if err := h.Pool.QueryRow(r.Context(), `
+			SELECT id FROM projects
+			WHERE id = $1 AND organization_id = $2 AND status = 'active'`,
+			req.ProjectID, orgID).Scan(&projectID); err != nil {
+			httpx.Error(w, r, http.StatusNotFound, "PROJECT_NOT_FOUND", "Project not found in this organization")
+			return
+		}
+	} else {
+		_ = h.Pool.QueryRow(r.Context(), `
+			SELECT id FROM projects WHERE organization_id = $1 AND slug = 'default'`,
+			orgID).Scan(&projectID)
+	}
+
 	raw, hash := Generate()
 	prefix := raw[:12]
 	var keyID string
 	if err := h.Pool.QueryRow(r.Context(), `
-		INSERT INTO api_keys (tenant_id, organization_id, name, prefix, secret_hash, scopes, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		id.TenantID, orgID, req.Name, prefix, hash, req.Scopes, id.UserID).Scan(&keyID); err != nil {
+		INSERT INTO api_keys (tenant_id, organization_id, project_id, name, prefix, secret_hash, scopes, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		id.TenantID, orgID, projectID, req.Name, prefix, hash, req.Scopes, id.UserID).Scan(&keyID); err != nil {
 		h.Log.Error("api key create failed", slog.String("error", err.Error()))
 		httpx.Internal(w, r)
 		return

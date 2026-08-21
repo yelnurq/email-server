@@ -32,6 +32,11 @@ type InfraMonitor struct {
 	Provider mailcore.Provider
 	TTL      time.Duration
 
+	// Optional security-scanner probes (V4 §114). nil reports the
+	// component as disabled.
+	RspamdPing func(ctx context.Context) error
+	ClamAVPing func(ctx context.Context) error
+
 	mu      sync.Mutex
 	cached  InfraReport
 	expires time.Time
@@ -110,6 +115,20 @@ func (m *InfraMonitor) collect(ctx context.Context) InfraReport {
 				c.Detail = st.Error
 			}
 			return c
+		}},
+		{"rspamd", func(ctx context.Context) Component {
+			if m.RspamdPing == nil {
+				return Component{Name: "rspamd", Status: "disabled", Detail: "spam scanner not configured"}
+			}
+			return timed("rspamd", func() error { return m.RspamdPing(ctx) })
+		}},
+		{"clamav", func(ctx context.Context) Component {
+			if m.ClamAVPing == nil {
+				return Component{Name: "clamav", Status: "disabled", Detail: "malware scanner not configured"}
+			}
+			// clamd answers only once its signature database is loaded, so
+			// "ok" here means ready, not merely alive (§115).
+			return timed("clamav", func() error { return m.ClamAVPing(ctx) })
 		}},
 		{"worker", func(ctx context.Context) Component {
 			var beatAt time.Time

@@ -17,6 +17,8 @@ import (
 	"github.com/yelnurq/email-server/internal/delivery"
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailservice"
+	"github.com/yelnurq/email-server/internal/scanner"
+	"github.com/yelnurq/email-server/internal/security"
 	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/webhooks"
 )
@@ -87,7 +89,14 @@ func run() error {
 		SubmitInsecureTLS: cfg.StalwartInsecureTLS,
 	}
 
-	w := &delivery.Worker{Pool: pool, NATS: nc, Log: log, Mail: mailSvc, Store: store}
+	w := &delivery.Worker{
+		Pool: pool, NATS: nc, Log: log, Mail: mailSvc, Store: store,
+		Scan: &security.Engine{
+			Rspamd: &scanner.Rspamd{BaseURL: cfg.RspamdURL, Password: cfg.RspamdPassword},
+			Clamd:  &scanner.Clamd{Addr: cfg.ClamAVAddr},
+			Log:    log,
+		},
+	}
 	log.Info("worker started")
 	workerErr := make(chan error, 1)
 	go func() {

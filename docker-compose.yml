@@ -115,6 +115,47 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Spam classification engine (V4 §38). Stalwart hands every inbound
+  # message to rspamd over the milter protocol (proxy worker on 11332);
+  # rspamd's antivirus module forwards attachments to ClamAV. The
+  # controller (11334, host ${RSPAMD_PORT}) serves the HTTP scan/metrics
+  # API used by the control plane.
+  rspamd:
+    image: rspamd/rspamd:3.9
+    container_name: mailplatform-rspamd
+    ports:
+      - "${RSPAMD_PORT:-11334}:11334"
+    volumes:
+      - ./deploy/rspamd/local.d:/etc/rspamd/local.d:ro
+      - rspamddata:/var/lib/rspamd
+    healthcheck:
+      test: ["CMD", "rspamadm", "control", "stat"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Malware scanner (V4 §44). Signature database persists in clamavdata;
+  # first start downloads it (freshclam), which can take minutes — the
+  # healthcheck reports ready only when clamd accepts connections, so
+  # health distinguishes "alive" from "ready" (§115).
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: mailplatform-clamav
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+    ports:
+      - "${CLAMAV_PORT:-3310}:3310"
+    volumes:
+      - clamavdata:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    restart: unless-stopped
+
   # Controlled SMTP delivery target for outbound tests (cmd/smtpsink).
   # It answers on the reserved domain sink.test via a network alias, so the
   # mail core reaches it through its normal implicit-MX path — no special
@@ -141,4 +182,6 @@ volumes:
   natsdata:
   miniodata:
   stalwartdata:
+  rspamddata:
+  clamavdata:
   sinkdata:

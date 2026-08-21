@@ -40,3 +40,15 @@ Real debt only; feature gaps live in PROJECT_STATUS.md. Updated 2026-08-20.
     One worker only; a fleet needs per-instance names and an aggregate view.
 14. **`scripts/e2e.ps1` publishes the webhook port via docker.** If port
     39991 is taken the webhook checks fail; parameterize when it bites.
+15. **App Control blocks freshly built `.exe` in the default temp dir and
+    intermittently in `bin/`** (Windows dev only). `go run` of a just-changed
+    binary and `go test` both need `GOTMPDIR` inside the repo (`.gotmp/`,
+    gitignored). Restarting the API/worker sometimes needs a uniquely named
+    binary (`bin/api-run.exe`). Disappears on Linux.
+16. **Rspamd controller password is in `deploy/rspamd/local.d/worker-controller.inc`
+    in clear** (dev value). Production must mount its own file with a strong
+    password; the platform reads it from `RSPAMD_PASSWORD`.
+17. **DKIM rotation keeps the previous key in the mail core indefinitely.**
+    `retire_after` is recorded and shown in guidance, but nothing prunes the
+    old signature settings after that date yet — a scheduled cleanup job is
+    the follow-up (foundation only, per §28).

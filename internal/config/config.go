@@ -32,6 +32,10 @@ type Config struct {
 
 	CookieSecure bool
 
+	// AppEnv is "development" (default) or "production". Production enables
+	// the startup safety checks in validateProduction (§158).
+	AppEnv string
+
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
 
@@ -76,6 +80,16 @@ type Config struct {
 	// subsystem ("host:port"); empty uses the system resolver. Point it at a
 	// controlled fixture for integration tests (§123).
 	DNSResolverAddr string
+
+	// Security scanners (V4). Empty disables the integration and health
+	// reports the component as disabled.
+	//
+	// RspamdURL is the rspamd controller base URL (scan API + metrics).
+	RspamdURL string
+	// RspamdPassword authenticates controller requests.
+	RspamdPassword string
+	// ClamAVAddr is the clamd TCP address for INSTREAM scans and health.
+	ClamAVAddr string
 }
 
 // Load reads configuration from the environment, optionally seeded by a .env
@@ -98,6 +112,7 @@ func Load() (*Config, error) {
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
 		LogFormat:           getEnv("LOG_FORMAT", "json"),
 
+		AppEnv:       getEnv("APP_ENV", "development"),
 		CookieSecure: getEnv("COOKIE_SECURE", "false") == "true",
 
 		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
@@ -121,6 +136,10 @@ func Load() (*Config, error) {
 		MailHostname:    getEnv("MAIL_HOSTNAME", "mail.company.test"),
 		OutboundIP:      os.Getenv("OUTBOUND_IP"),
 		DNSResolverAddr: os.Getenv("DNS_RESOLVER_ADDR"),
+
+		RspamdURL:      getEnv("RSPAMD_URL", "http://localhost:11334"),
+		RspamdPassword: os.Getenv("RSPAMD_PASSWORD"),
+		ClamAVAddr:     getEnv("CLAMAV_ADDR", "localhost:3310"),
 	}
 
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
@@ -157,7 +176,64 @@ func Load() (*Config, error) {
 	default:
 		return nil, fmt.Errorf("MAIL_CORE_PROVIDER must be none or stalwart, got %q", cfg.MailCoreProvider)
 	}
+	if cfg.AppEnv == "production" {
+		if err := cfg.validateProduction(); err != nil {
+			return nil, err
+		}
+	}
 	return cfg, nil
+}
+
+// devDefaults are the development-only credentials that must never survive
+// into a production deployment (§158, §168).
+var devDefaults = map[string]bool{
+	"":                      true,
+	"changeme":              true,
+	"change-me-please":      true,
+	"mailplatform_dev":      true,
+	"stalwart_dev_admin":    true,
+	"stalwart_dev_master":   true,
+	"rspamd_dev_controller": true,
+	"minioadmin_dev":        true,
+}
+
+// validateProduction refuses to start with development-grade configuration
+// when APP_ENV=production: default passwords, self-signed mail-core TLS,
+// insecure cookies, or an unset public hostname (§158, §168, §196). It fails
+// fast with a single message listing every problem, so a misconfigured
+// production deploy never half-starts insecure.
+func (c *Config) validateProduction() error {
+	var problems []string
+	check := func(cond bool, msg string) {
+		if cond {
+			problems = append(problems, msg)
+		}
+	}
+
+	check(!c.CookieSecure, "COOKIE_SECURE must be true in production (cookies over TLS only)")
+	check(c.StalwartInsecureTLS, "STALWART_INSECURE_TLS must be false in production (no self-signed fallback)")
+	check(devDefaults[c.BootstrapAdminPassword] && c.BootstrapAdminPassword != "",
+		"BOOTSTRAP_ADMIN_PASSWORD is a development default")
+	check(c.MailHostname == "" || c.MailHostname == "mail.company.test",
+		"MAIL_HOSTNAME must be set to the real public mail host")
+	check(c.PublicAppURL == "" || strings.Contains(c.PublicAppURL, "localhost"),
+		"PUBLIC_APP_URL must be the real public app URL, not localhost")
+	check(strings.HasPrefix(c.PublicAppURL, "http://"),
+		"PUBLIC_APP_URL must use https in production")
+
+	if c.MailCoreProvider == "stalwart" {
+		check(devDefaults[c.StalwartAdminPass], "STALWART_ADMIN_PASSWORD is a development default")
+		check(devDefaults[c.StalwartMasterPass], "STALWART_MASTER_PASSWORD is a development default")
+	}
+	// Postgres/S3 default secrets embedded in URLs.
+	check(strings.Contains(c.DatabaseURL, "mailplatform_dev"), "DATABASE_URL carries the development password")
+	check(strings.Contains(c.DatabaseURL, "sslmode=disable"), "DATABASE_URL must not disable TLS in production")
+	check(devDefaults[c.S3SecretKey], "S3_SECRET_KEY is a development default")
+
+	if len(problems) > 0 {
+		return fmt.Errorf("insecure production configuration:\n  - %s", strings.Join(problems, "\n  - "))
+	}
+	return nil
 }
 
 func getEnv(key, fallback string) string {

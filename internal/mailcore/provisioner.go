@@ -2,8 +2,11 @@ package mailcore
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -192,6 +195,11 @@ func (p *Provisioner) ProvisionDomain(ctx context.Context, tenantID, domainID, a
 	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), provisionTimeout)
 	defer cancel()
 	err := p.Provider.EnsureDomain(callCtx, name)
+	if err == nil {
+		// Every provisioned domain gets a signing key (V4 §20): outbound
+		// mail must be DKIM-signed by default, not as an optional extra.
+		err = p.ensureDKIM(ctx, callCtx, tenantID, domainID, name, actorUserID)
+	}
 	if err != nil {
 		// Keep the entity in a non-terminal state: the job runner decides
 		// whether this attempt is retryable and marks 'failed' only when it
@@ -217,6 +225,48 @@ func (p *Provisioner) ProvisionDomain(ctx context.Context, tenantID, domainID, a
 		Detail: map[string]any{"name": name, "provider": p.Provider.Name()},
 	})
 	return "active", nil
+}
+
+// NewDKIMSelector issues a date-versioned selector (V4 §24): unique per
+// domain and per rotation, e.g. "s202608-k3xq".
+func NewDKIMSelector() string {
+	var raw [3]byte
+	_, _ = rand.Read(raw[:])
+	suffix := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw[:]))
+	return "s" + time.Now().UTC().Format("200601") + "-" + suffix[:4]
+}
+
+// ensureDKIM guarantees the domain has an active signing key: the mail core
+// generates one (private key stays there), the control plane records the
+// selector and public key for DNS verification and rotation (§20-28).
+func (p *Provisioner) ensureDKIM(ctx, callCtx context.Context, tenantID, domainID, name, actorUserID string) error {
+	var existing int
+	if err := p.Pool.QueryRow(ctx, `
+		SELECT count(*) FROM dkim_keys WHERE domain_id = $1 AND status = 'active'`,
+		domainID).Scan(&existing); err != nil {
+		return err
+	}
+	if existing > 0 {
+		return nil
+	}
+	selector := NewDKIMSelector()
+	publicKey, err := p.Provider.EnsureDKIMKey(callCtx, name, selector, "rsa")
+	if err != nil {
+		return err
+	}
+	if _, err := p.Pool.Exec(ctx, `
+		INSERT INTO dkim_keys (tenant_id, domain_id, selector, algorithm, public_key, status, activated_at)
+		VALUES ($1, $2, $3, 'rsa', $4, 'active', now())
+		ON CONFLICT (domain_id, selector) DO NOTHING`,
+		tenantID, domainID, selector, publicKey); err != nil {
+		return err
+	}
+	p.Audit.Record(ctx, audit.Entry{
+		TenantID: tenantID, ActorUserID: actorUserID, Action: "dkim.generate",
+		ResourceType: "domain", ResourceID: domainID,
+		Detail: map[string]any{"domain": name, "selector": selector, "algorithm": "rsa"},
+	})
+	return nil
 }
 
 // ProvisionMailbox pushes one mailbox account into the mail core (ensuring

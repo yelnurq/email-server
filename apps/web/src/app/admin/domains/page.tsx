@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type Domain, type Organization } from "@/lib/api";
 import { Badge, Button, EmptyState, Input, PageLoader, useToast } from "@/components/ui";
+import { Icon } from "@/components/icons";
 
 // Mail-core provisioning state of a domain. "failed" keeps the error in a
 // tooltip and offers a retry; "skipped" means no mail core is configured.
@@ -142,16 +144,21 @@ export default function DomainsPage() {
               <tr className="border-b border-border text-left text-xs">
                 <th className="px-4 py-3 font-medium">Domain</th>
                 <th className="px-4 py-3 font-medium">Organization</th>
+                <th className="px-4 py-3 font-medium">Project</th>
                 <th className="px-4 py-3 font-medium">Mode</th>
                 <th className="px-4 py-3 font-medium">Verification</th>
                 <th className="px-4 py-3 font-medium">Mail core</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {domains.data.domains.map((d) => (
                 <tr key={d.id}>
-                  <td className="px-4 py-3 font-semibold">{d.name}</td>
+                  <td className="px-4 py-3 font-semibold">
+                    <Link href={`/admin/domains/${d.id}`} className="hover:text-primary hover:underline">{d.name}</Link>
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{orgName(d.organization_id)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{d.project_name || "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{d.verification_mode}</td>
                   <td className="px-4 py-3">
                     <Badge tone={d.status === "verified" ? "success" : "neutral"}>{d.status}</Badge>
@@ -162,6 +169,11 @@ export default function DomainsPage() {
                       onRetry={() => provision.mutate(d.id)}
                       retrying={provision.isPending && provision.variables === d.id}
                     />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link href={`/admin/domains/${d.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                      Manage <Icon name="chevron-right" className="h-3 w-3" />
+                    </Link>
                   </td>
                 </tr>
               ))}
