@@ -50,7 +50,7 @@ type PendingUpload = {
 };
 
 function parseAddresses(s: string): string[] {
-  return s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+  return [...new Set(s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean))];
 }
 
 export function ComposeProvider({ children }: { children: React.ReactNode }) {
@@ -77,6 +77,7 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
   const [minimized, setMinimized] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [to, setTo] = useState(opts.to ?? "");
+  const [pendingTo, setPendingTo] = useState("");
   const [cc, setCc] = useState(opts.cc ?? "");
   const [bcc, setBcc] = useState("");
   const [showCc, setShowCc] = useState(Boolean(opts.cc));
@@ -123,25 +124,27 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
   }, []);
 
   const saveDraft = useCallback(async () => {
-    const body = { to: parseAddresses(to), cc: parseAddresses(cc), bcc: parseAddresses(bcc), subject, text };
+    const body = { to: parseAddresses(`${to},${pendingTo}`), cc: parseAddresses(cc), bcc: parseAddresses(bcc), subject, text };
     try {
       // Drafts live in the mail store, which has no in-place update: each
       // save writes a new copy and returns its id, so always adopt it.
+      let currentDraftId: string;
       if (draftId) {
         const res = await api.put<{ id: string }>(`/api/v1/mail/drafts/${draftId}`, body);
-        if (res?.id) setDraftId(res.id);
+        currentDraftId = res.id;
       } else {
         const res = await api.post<{ id: string }>("/api/v1/mail/drafts", body);
-        setDraftId(res.id);
+        currentDraftId = res.id;
       }
+      setDraftId(currentDraftId);
       dirty.current = false;
       setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       qc.invalidateQueries({ queryKey: ["mail"] });
-      return true;
+      return currentDraftId;
     } catch {
-      return false;
+      return null;
     }
-  }, [to, cc, bcc, subject, text, draftId, qc]);
+  }, [to, pendingTo, cc, bcc, subject, text, draftId, qc]);
 
   // Autosave every 5s while there is unsaved content.
   useEffect(() => {
@@ -185,7 +188,7 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
   }
 
   async function send() {
-    const toList = parseAddresses(to);
+    const toList = parseAddresses(`${to},${pendingTo}`);
     if (toList.length === 0) {
       toast("error", "Add at least one recipient");
       return;
@@ -197,29 +200,26 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
     const attachmentIds = uploads.filter((u) => u.attachment).map((u) => u.attachment!.id);
     setSending(true);
     try {
-      if (draftId && attachmentIds.length === 0 && !inReplyTo) {
-        const ok = await saveDraft();
-        if (!ok) throw new Error("draft save failed");
-        await api.post(`/api/v1/mail/drafts/${draftId}/send`);
-      } else {
-        await api.post("/api/v1/mail/send", {
-          to: toList,
-          cc: parseAddresses(cc),
-          bcc: parseAddresses(bcc),
-          subject,
-          text,
-          attachment_ids: attachmentIds,
-          ...(inReplyTo ? { in_reply_to: inReplyTo } : {}),
-        });
-        if (draftId) await api.delete(`/api/v1/mail/messages/${draftId}`).catch(() => {});
-      }
+      // Submit the current form directly. Draft saves replace the underlying
+      // mail-store object and can briefly leave its previous/current id
+      // unavailable; sending must not depend on that transient object.
+      await api.post("/api/v1/mail/send", {
+        to: toList,
+        cc: parseAddresses(cc),
+        bcc: parseAddresses(bcc),
+        subject,
+        text,
+        attachment_ids: attachmentIds,
+        ...(inReplyTo ? { in_reply_to: inReplyTo } : {}),
+      });
+      if (draftId) await api.delete(`/api/v1/mail/messages/${draftId}`).catch(() => {});
       qc.invalidateQueries({ queryKey: ["mail"] });
       toast("success", "Message sent");
       onClose();
     } catch (err) {
       toast(
         "error",
-        err instanceof ApiError && err.code === "INVALID_MESSAGE" ? err.message : "Could not send. Draft is preserved.",
+        err instanceof ApiError ? err.message : "Could not send. Draft is preserved.",
       );
       if (!draftId) void saveDraft();
     } finally {
@@ -308,7 +308,13 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
               <div className="flex items-start gap-2 border-b border-border px-4">
                 <span className="pt-2.5 text-[13px] text-muted-foreground">To</span>
                 <div className="min-w-0 flex-1">
-                  <RecipientSelector value={to} onChange={(next) => { setTo(next); markDirty(); }} autoFocus={!opts.draftId} placeholder="" />
+                  <RecipientSelector
+                    value={to}
+                    onChange={(next) => { setTo(next); markDirty(); }}
+                    onPendingAddressChange={(next) => { setPendingTo(next); markDirty(); }}
+                    autoFocus={!opts.draftId}
+                    placeholder=""
+                  />
                 </div>
                 {!showCc && (
                   <button type="button" className="shrink-0 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground" onClick={() => setShowCc(true)}>
