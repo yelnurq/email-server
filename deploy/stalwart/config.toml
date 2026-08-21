@@ -1,6 +1,5 @@
 # Stalwart Mail Server — local development configuration for the mail
-# platform. Mounted read-only into the container at
-# /opt/stalwart/etc/config.toml.
+# platform. Used locally by the Stalwart process started from the workspace.
 #
 # Principles:
 #   - the Go control plane provisions domains/accounts via the management API
@@ -10,33 +9,33 @@
 #     mail clients must allow it; production replaces this with real certs.
 
 [server]
-hostname = "mail.company.test"
+hostname = "mail.smart-osi.kz"
 
 [server.listener.smtp]
-bind = ["[::]:25"]
+bind = ["[::]:2525"]
 protocol = "smtp"
 
 [server.listener.submission]
-bind = ["[::]:587"]
+bind = ["[::]:1587"]
 protocol = "smtp"
 
 [server.listener.submissions]
-bind = ["[::]:465"]
+bind = ["[::]:1465"]
 protocol = "smtp"
 tls.implicit = true
 
 [server.listener.imap]
-bind = ["[::]:143"]
+bind = ["[::]:1143"]
 protocol = "imap"
 
 [server.listener.imaptls]
-bind = ["[::]:993"]
+bind = ["[::]:1993"]
 protocol = "imap"
 tls.implicit = true
 
 # Management REST API + JMAP + web admin share the HTTP listener.
 [server.listener.http]
-bind = ["[::]:8080"]
+bind = ["[::]:8180"]
 protocol = "http"
 
 [storage]
@@ -48,10 +47,27 @@ directory = "internal"
 
 [store.rocksdb]
 type = "rocksdb"
-path = "/opt/stalwart/data"
+path = "/home/admmail/email/var/stalwart/data"
 compression = "lz4"
 
-[directory.internal]
+[config]
+local-keys = [
+  "store.*",
+  "directory.*",
+  "tracer.*",
+  "server.*",
+  "authentication.fallback-admin.*",
+  "authentication.master.*",
+  "config.local-keys.*",
+  "certificate.*",
+  "storage.data",
+  "storage.blob",
+  "storage.lookup",
+  "storage.fts",
+  "storage.directory",
+]
+
+directory.internal]
 type = "internal"
 store = "rocksdb"
 
@@ -86,3 +102,13 @@ secret = "%{env:STALWART_ADMIN_SECRET}%"
 [authentication.master]
 user = "master"
 secret = "%{env:STALWART_MASTER_SECRET}%"
+
+# The public ACME certificate is shared by the web proxy and mail listeners.
+# Certbot renews the files in place; Stalwart is restarted by the renewal hook.
+[server.tls]
+certificate = "default"
+
+[certificate.default]
+cert = "%{file:/etc/letsencrypt/live/mail.smart-osi.kz/fullchain.pem}%"
+private-key = "%{file:/etc/letsencrypt/live/mail.smart-osi.kz/privkey.pem}%"
+default = true
