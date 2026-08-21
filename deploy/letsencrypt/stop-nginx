@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+nginx -s stop 2>/dev/null || true
+for _ in $(seq 1 20); do
+    if ! ss -ltn | grep -q ':80 '; then
+        exit 0
+    fi
+    sleep 1
+done
+exit 0
