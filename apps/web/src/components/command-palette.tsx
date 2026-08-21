@@ -53,6 +53,8 @@ export function CommandPalette() {
 
   const can = (p: string) => me.data?.permissions.includes(p) ?? false;
   const isAdmin = can("users.manage");
+  const canMail = can("mail.read");
+  const canSendMail = can("mail.send");
 
   const people = useQuery({
     queryKey: ["directory", "palette", query],
@@ -64,15 +66,17 @@ export function CommandPalette() {
 
   const commands = useMemo<Command[]>(() => {
     const base: Command[] = [
-      { id: "compose", label: "New message", hint: "C", icon: "pen", keywords: "compose write email new", section: "Actions", run: () => { setOpen(false); openCompose(); } },
-      ...(query.trim()
+      ...(canSendMail ? [{ id: "compose", label: "New message", hint: "C", icon: "pen", keywords: "compose write email new", section: "Actions", run: () => { setOpen(false); openCompose(); } }] : []),
+      ...(canMail && query.trim()
         ? [{ id: "search-mail", label: `Search mail for “${query.trim()}”`, icon: "search", section: "Actions", run: go(`/mail/search?q=${encodeURIComponent(query.trim())}`) }]
         : []),
-      { id: "inbox", label: "Go to Inbox", icon: "inbox", keywords: "mail folder", section: "Mail", run: go("/mail/inbox") },
-      { id: "sent", label: "Go to Sent", icon: "send", keywords: "mail folder", section: "Mail", run: go("/mail/sent") },
-      { id: "drafts", label: "Go to Drafts", icon: "file-text", keywords: "mail folder", section: "Mail", run: go("/mail/drafts") },
-      { id: "spam", label: "Go to Spam", icon: "alert-octagon", keywords: "mail folder junk", section: "Mail", run: go("/mail/spam") },
-      { id: "trash", label: "Go to Trash", icon: "trash", keywords: "mail folder deleted", section: "Mail", run: go("/mail/trash") },
+      ...(canMail ? [
+        { id: "inbox", label: "Go to Inbox", icon: "inbox", keywords: "mail folder", section: "Mail", run: go("/mail/inbox") },
+        { id: "sent", label: "Go to Sent", icon: "send", keywords: "mail folder", section: "Mail", run: go("/mail/sent") },
+        { id: "drafts", label: "Go to Drafts", icon: "file-text", keywords: "mail folder", section: "Mail", run: go("/mail/drafts") },
+        { id: "spam", label: "Go to Spam", icon: "alert-octagon", keywords: "mail folder junk", section: "Mail", run: go("/mail/spam") },
+        { id: "trash", label: "Go to Trash", icon: "trash", keywords: "mail folder deleted", section: "Mail", run: go("/mail/trash") },
+      ] : []),
       ...(can("messages.send") ? [{ id: "messages", label: "Open Messages", icon: "message-circle", keywords: "chat conversation", section: "Workspace", run: go("/mail/messages") }] : []),
       ...(can("tasks.manage.self") ? [{ id: "tasks", label: "Open Tasks & Reminders", icon: "check-circle", keywords: "reminder todo", section: "Workspace", run: go("/mail/my-list") }] : []),
       ...(can("departments.read") ? [{ id: "contacts", label: "Open Contacts", icon: "users", keywords: "people directory", section: "Workspace", run: go("/mail/contacts") }] : []),
@@ -92,7 +96,7 @@ export function CommandPalette() {
     const q = query.trim().toLowerCase();
     if (!q) return base;
     return base.filter((c) => `${c.label} ${c.keywords ?? ""}`.toLowerCase().includes(q) || c.id === "search-mail");
-  }, [query, isAdmin, me.data, openCompose]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, isAdmin, canMail, canSendMail, me.data, openCompose]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const peopleItems: Command[] = (query.trim().length >= 2 ? people.data?.users ?? [] : []).map((u) => ({
     id: `person-${u.id}`,
