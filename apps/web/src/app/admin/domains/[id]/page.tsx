@@ -64,6 +64,13 @@ export default function DomainDetailPage({ params }: { params: Promise<{ id: str
           <h1 className="page-title">{d.name}</h1>
           <Badge tone={d.status === "verified" ? "success" : "neutral"}>{d.status}</Badge>
           {d.project_name && <Badge tone="neutral">{d.project_name}</Badge>}
+          <Link
+            href={`/admin/domains/${id}/dns`}
+            className="inline-flex h-8 items-center gap-1 rounded-[7px] border border-border-strong bg-surface-elevated px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            <Icon name="globe" className="h-3.5 w-3.5" />
+            DNS & DKIM
+          </Link>
         </div>
       </section>
 
