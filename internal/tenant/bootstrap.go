@@ -92,9 +92,8 @@ func Bootstrap(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, cfg Bo
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO user_roles (user_id, role_code, scope_type, scope_id)
-		VALUES ($1, 'super_admin', 'platform', NULL),
-		       ($1, 'tenant_owner', 'tenant', $2)`,
-		userID, tenantID); err != nil {
+		VALUES ($1, 'super_admin', 'platform', NULL)`,
+		userID); err != nil {
 		return err
 	}
 
