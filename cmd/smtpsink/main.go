@@ -39,7 +39,13 @@ type received struct {
 	Subject    string   `json:"subject"`
 	MessageID  string   `json:"message_id"`
 	RemoteAddr string   `json:"remote_addr"`
+	// Raw carries the full RFC822 bytes (capped) so tests can assert on
+	// wire-level properties — DKIM-Signature presence and validity (§122).
+	Raw string `json:"raw,omitempty"`
 }
+
+// rawCap bounds the stored raw message; delivery tests use small messages.
+const rawCap = 256 << 10
 
 var (
 	logMu   sync.Mutex
@@ -197,6 +203,9 @@ func record(conn net.Conn, from string, rcpts []string, body string) {
 	rec := received{
 		At: time.Now().UTC().Format(time.RFC3339), From: from, To: rcpts,
 		SizeBytes: len(body), RemoteAddr: conn.RemoteAddr().String(),
+	}
+	if len(body) <= rawCap {
+		rec.Raw = body
 	}
 	for _, line := range strings.Split(body, "\n") {
 		l := strings.TrimRight(line, "\r")

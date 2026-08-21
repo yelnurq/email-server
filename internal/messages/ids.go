@@ -16,7 +16,10 @@ func NewPublicID() string {
 	return "msg_" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw[:]))
 }
 
-// NewRFCMessageID returns an RFC 5322 Message-ID scoped to the sender domain.
+// NewRFCMessageID returns a new RFC 5322 Message-ID scoped to the sender
+// domain, in the platform's canonical bare form (no angle brackets — those
+// are wire format, added only by the MIME renderer; see
+// mailaddr.NormalizeMessageID).
 func NewRFCMessageID(domain string) string {
-	return "<" + uuid.NewString() + "@" + domain + ">"
+	return uuid.NewString() + "@" + strings.ToLower(domain)
 }

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yelnurq/email-server/internal/mailaddr"
 )
 
 // Service is the application mail layer: mailbox semantics for webmail and
@@ -217,7 +219,7 @@ func metaToItem(m emailMeta) ListItem {
 		HasAttachments: m.HasAttachment,
 	}
 	if len(m.MessageID) > 0 {
-		it.MessageID = m.MessageID[0]
+		it.MessageID = mailaddr.NormalizeMessageID(m.MessageID[0])
 	}
 	if len(m.From) > 0 {
 		it.From = m.From[0].Email
@@ -350,8 +352,6 @@ type Message struct {
 	HasAttachments bool             `json:"has_attachments"`
 	Attachments    []AttachmentView `json:"attachments"`
 	Thread         []ThreadItem     `json:"thread"`
-	RFCInReplyTo   string           `json:"-"`
-	RFCReferences  string           `json:"-"`
 }
 
 type bodyPart struct {
@@ -373,8 +373,8 @@ func (s *Service) GetMessage(ctx context.Context, email, id string) (*Message, e
 		"accountId": info.AccountID,
 		"ids":       []string{id},
 		"properties": []string{
-			"id", "threadId", "mailboxIds", "keywords", "messageId", "inReplyTo",
-			"references", "from", "to", "cc", "bcc", "subject", "receivedAt",
+			"id", "threadId", "mailboxIds", "keywords", "messageId",
+			"from", "to", "cc", "bcc", "subject", "receivedAt",
 			"hasAttachment", "bodyValues", "textBody", "htmlBody", "attachments",
 		},
 		"fetchTextBodyValues": true,
@@ -387,9 +387,7 @@ func (s *Service) GetMessage(ctx context.Context, email, id string) (*Message, e
 	var resp struct {
 		List []struct {
 			emailMeta
-			InReplyTo  []string       `json:"inReplyTo"`
-			References []string       `json:"references"`
-			To         []emailAddress `json:"to"`
+			To []emailAddress `json:"to"`
 			Cc         []emailAddress `json:"cc"`
 			Bcc        []emailAddress `json:"bcc"`
 			BodyValues map[string]struct {
@@ -417,13 +415,7 @@ func (s *Service) GetMessage(ctx context.Context, email, id string) (*Message, e
 		Thread:         []ThreadItem{},
 	}
 	if len(e.MessageID) > 0 {
-		msg.MessageID = e.MessageID[0]
-	}
-	if len(e.InReplyTo) > 0 {
-		msg.RFCInReplyTo = e.InReplyTo[0]
-	}
-	if len(e.References) > 0 {
-		msg.RFCReferences = strings.Join(e.References, " ")
+		msg.MessageID = mailaddr.NormalizeMessageID(e.MessageID[0])
 	}
 	if len(e.From) > 0 {
 		msg.From = e.From[0].Email
@@ -678,14 +670,76 @@ func (s *Service) SubmitExternal(ctx context.Context, fromAccount, mailFrom stri
 	return c.Quit()
 }
 
-// NormalizeMessageID strips the RFC 5322 angle brackets so identifiers can
-// be compared across stores: the control plane persists "<id@domain>" while
-// JMAP reports the bare "id@domain".
-func NormalizeMessageID(id string) string {
-	id = strings.TrimSpace(id)
-	id = strings.TrimPrefix(id, "<")
-	id = strings.TrimSuffix(id, ">")
-	return strings.ToLower(id)
+// HasMessage reports whether the account's folder already holds a message
+// with the given RFC Message-ID. This is the duplicate guard that makes
+// mail-store imports idempotent across crashes: delivery, the Sent copy,
+// quarantine release and the legacy migration all check it before importing
+// again. The header filter matches a substring of the wire header, so the
+// canonical (bare) id matches regardless of angle brackets.
+func (s *Service) HasMessage(ctx context.Context, email, folderType, rfcID string) (bool, error) {
+	rfcID = mailaddr.NormalizeMessageID(rfcID)
+	if rfcID == "" {
+		return false, nil
+	}
+	info, err := s.account(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	mb, ok := info.ByRole[RoleForType(folderType)]
+	if !ok {
+		return false, fmt.Errorf("no folder with role %q", RoleForType(folderType))
+	}
+	out, err := s.JMAP.Request(ctx, email, Call("0", "Email/query", map[string]any{
+		"accountId": info.AccountID,
+		"filter": map[string]any{
+			"operator": "AND",
+			"conditions": []map[string]any{
+				{"inMailbox": mb.ID},
+				{"header": []string{"Message-ID", rfcID}},
+			},
+		},
+		"limit": 1,
+	}))
+	if err != nil {
+		return false, err
+	}
+	var resp struct {
+		IDs []string `json:"ids"`
+	}
+	if err := Decode(out[0], &resp); err != nil {
+		return false, err
+	}
+	return len(resp.IDs) > 0, nil
+}
+
+// MessageIDOf returns the canonical RFC Message-ID of one stored message
+// ("" when the message has none or does not exist). Used to keep a draft's
+// identity stable across saves.
+func (s *Service) MessageIDOf(ctx context.Context, email, id string) (string, error) {
+	info, err := s.account(ctx, email)
+	if err != nil {
+		return "", err
+	}
+	out, err := s.JMAP.Request(ctx, email, Call("0", "Email/get", map[string]any{
+		"accountId":  info.AccountID,
+		"ids":        []string{id},
+		"properties": []string{"id", "messageId"},
+	}))
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		List []struct {
+			MessageID []string `json:"messageId"`
+		} `json:"list"`
+	}
+	if err := Decode(out[0], &resp); err != nil {
+		return "", err
+	}
+	if len(resp.List) == 0 || len(resp.List[0].MessageID) == 0 {
+		return "", nil
+	}
+	return mailaddr.NormalizeMessageID(resp.List[0].MessageID[0]), nil
 }
 
 // receivedAtKey carries an explicit arrival timestamp for Import. It is a

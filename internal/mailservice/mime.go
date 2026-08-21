@@ -9,6 +9,8 @@ import (
 	"net/textproto"
 	"strings"
 	"time"
+
+	"github.com/yelnurq/email-server/internal/mailaddr"
 )
 
 // AttachmentPart is one file to embed into an outgoing message.
@@ -27,9 +29,11 @@ type Envelope struct {
 	Cc          []string
 	Subject     string
 	Date        time.Time
-	RFCID       string // Message-ID, e.g. <abc@domain>
-	InReplyTo   string
-	References  string
+	// RFCID, InReplyTo and References hold canonical Message-IDs (bare,
+	// no angle brackets); the renderer adds the wire-format brackets.
+	RFCID      string
+	InReplyTo  string
+	References string
 	Text        string
 	HTML        string
 	Attachments []AttachmentPart
@@ -82,9 +86,9 @@ func BuildMessage(env Envelope) []byte {
 		date = time.Now().UTC()
 	}
 	h("Date", date.Format(time.RFC1123Z))
-	h("Message-ID", env.RFCID)
-	h("In-Reply-To", env.InReplyTo)
-	h("References", env.References)
+	h("Message-ID", mailaddr.BracketMessageID(env.RFCID))
+	h("In-Reply-To", mailaddr.BracketMessageID(env.InReplyTo))
+	h("References", mailaddr.FormatMessageIDList(mailaddr.ParseMessageIDList(env.References)))
 	h("MIME-Version", "1.0")
 
 	// Inner body: plain text, or alternative when HTML is present.

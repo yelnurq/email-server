@@ -116,11 +116,24 @@ func (h *Handlers) Release(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
-	if _, err := h.Mail.Import(r.Context(), mailboxAddress, "inbox", raw, false); err != nil {
-		h.Log.Error("quarantine release import failed", slog.String("error", err.Error()))
-		httpx.Error(w, r, http.StatusBadGateway, "MAIL_SERVICE_UNAVAILABLE",
-			"The mail service did not accept the message; try again")
+	// Crash-safe: a previous release may have imported the copy and failed
+	// before its commit — re-releasing must not duplicate the message.
+	var rfcID string
+	_ = tx.QueryRow(r.Context(),
+		`SELECT rfc_message_id FROM messages WHERE id = $1`, messageID).Scan(&rfcID)
+	dup, dupErr := h.Mail.HasMessage(r.Context(), mailboxAddress, "inbox", rfcID)
+	if dupErr != nil && errors.Is(dupErr, mailservice.ErrUnavailable) {
+		httpx.Error(w, r, http.StatusServiceUnavailable, "MAIL_SERVICE_UNAVAILABLE",
+			"The mail service is temporarily unavailable; try again")
 		return
+	}
+	if !dup {
+		if _, err := h.Mail.Import(r.Context(), mailboxAddress, "inbox", raw, false); err != nil {
+			h.Log.Error("quarantine release import failed", slog.String("error", err.Error()))
+			httpx.Error(w, r, http.StatusServiceUnavailable, "MAIL_SERVICE_UNAVAILABLE",
+				"The mail service did not accept the message; try again")
+			return
+		}
 	}
 	if _, err := tx.Exec(r.Context(),
 		`UPDATE message_recipients SET status = 'delivered', error = '' WHERE id = $1`,

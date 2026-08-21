@@ -180,9 +180,11 @@ type recipient struct {
 
 // deliver routes one accepted message. Recipient rows are the idempotency
 // guard: a redelivery only reprocesses recipients still pending. Mail-store
-// imports are at-least-once — a crash between an import and its status
-// commit can duplicate one mailbox copy on retry, the standard SMTP
-// trade-off (documented in TECH_DEBT).
+// imports used to be at-least-once (a crash between an import and its
+// status commit duplicated one mailbox copy on retry); the pre-import
+// Message-ID check via Mail.HasMessage closes that window — a redelivery
+// that finds its Message-ID already in the target folder marks the
+// recipient delivered without importing again.
 func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	tx, err := w.Pool.Begin(ctx)
 	if err != nil {
@@ -190,15 +192,15 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	}
 	defer tx.Rollback(ctx)
 
-	var status, fromAddress, msgOrgID, subject, bodyText string
+	var status, fromAddress, msgOrgID, subject, bodyText, rfcID string
 	var sentImported *time.Time
 	err = tx.QueryRow(ctx, `
 		SELECT status, from_address::text, COALESCE(organization_id::text, ''),
-		       subject, body_text, sent_imported_at
+		       subject, body_text, rfc_message_id, sent_imported_at
 		FROM messages
 		WHERE id = $1 AND tenant_id = $2
 		FOR UPDATE`, p.MessageID, p.TenantID).
-		Scan(&status, &fromAddress, &msgOrgID, &subject, &bodyText, &sentImported)
+		Scan(&status, &fromAddress, &msgOrgID, &subject, &bodyText, &rfcID, &sentImported)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errPermanent // message vanished; never deliverable
 	}
@@ -291,6 +293,16 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 				// never lost and never wrongly bounced.
 				return errNotProvisioned
 			}
+			// Crash-safe idempotency: a previous attempt may have imported
+			// this copy and died before the status commit. The Message-ID
+			// check is folder-scoped, so a legitimate Sent+Inbox self-mail
+			// pair is never mistaken for a duplicate.
+			if dup, derr := w.alreadyImported(ctx, t.address, targetFolder, rfcID); derr != nil {
+				return derr // transient: retry the whole delivery
+			} else if dup {
+				deliveredTo = t.mailboxID
+				continue
+			}
 			if _, err := w.Mail.Import(ctx, t.address, targetFolder, raw, false); err != nil {
 				if errors.Is(err, mailservice.ErrUnavailable) || errors.Is(err, mailcore.ErrUnavailable) {
 					return err // transient: retry the whole delivery
@@ -338,7 +350,18 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 			                 AND provisioning_status IN ('active', 'skipped'))`,
 			fromAddress).Scan(&mbExists)
 		if mbExists {
-			if _, err := w.Mail.Import(ctx, fromAddress, "sent", raw, true); err != nil {
+			// Same crash-safe guard as local delivery: sent_imported_at may
+			// have been lost to a crash after a successful import.
+			dup, derr := w.alreadyImported(ctx, fromAddress, "sent", rfcID)
+			if derr != nil {
+				return derr
+			}
+			if dup {
+				if _, err := tx.Exec(ctx,
+					`UPDATE messages SET sent_imported_at = now() WHERE id = $1`, p.MessageID); err != nil {
+					return err
+				}
+			} else if _, err := w.Mail.Import(ctx, fromAddress, "sent", raw, true); err != nil {
 				if errors.Is(err, mailservice.ErrUnavailable) || errors.Is(err, mailcore.ErrUnavailable) {
 					return err
 				}
@@ -376,6 +399,26 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// alreadyImported is the crash-dedupe guard around mail-store imports.
+// Transient store failures propagate (the whole delivery retries); any
+// other guard failure degrades to "not imported" so delivery falls back to
+// the previous at-least-once behavior instead of blocking mail flow.
+func (w *Worker) alreadyImported(ctx context.Context, address, folder, rfcID string) (bool, error) {
+	if rfcID == "" {
+		return false, nil
+	}
+	dup, err := w.Mail.HasMessage(ctx, address, folder, rfcID)
+	if err != nil {
+		if errors.Is(err, mailservice.ErrUnavailable) || errors.Is(err, mailcore.ErrUnavailable) {
+			return false, err
+		}
+		w.Log.Warn("duplicate check unavailable, importing anyway",
+			slog.String("address", address), slog.String("error", err.Error()))
+		return false, nil
+	}
+	return dup, nil
 }
 
 type deliveryTarget struct {

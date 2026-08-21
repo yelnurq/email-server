@@ -19,6 +19,7 @@ import (
 
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/httpx"
+	"github.com/yelnurq/email-server/internal/mailaddr"
 	"github.com/yelnurq/email-server/internal/mailservice"
 	"github.com/yelnurq/email-server/internal/messages"
 )
@@ -291,9 +292,12 @@ func (h *Handlers) resolveReplyTarget(r *http.Request, account, replyTo string) 
 	if err != nil || msg == nil || msg.MessageID == "" {
 		return ""
 	}
+	// Both sides are canonical (bare, domain lowercased): the store id is
+	// normalized at the JMAP boundary, the column by migration 00019.
 	var publicID string
 	err = h.Pool.QueryRow(r.Context(),
-		`SELECT public_id FROM messages WHERE rfc_message_id = $1`, msg.MessageID).Scan(&publicID)
+		`SELECT public_id FROM messages WHERE rfc_message_id = $1`,
+		mailaddr.NormalizeMessageID(msg.MessageID)).Scan(&publicID)
 	if errors.Is(err, pgx.ErrNoRows) || err != nil {
 		return ""
 	}
@@ -323,7 +327,8 @@ func (h *Handlers) Events(w http.ResponseWriter, r *http.Request) {
 	}
 	var msgID, status string
 	err = h.Pool.QueryRow(r.Context(),
-		`SELECT id, status FROM messages WHERE rfc_message_id = $1`, msg.MessageID).Scan(&msgID, &status)
+		`SELECT id, status FROM messages WHERE rfc_message_id = $1`,
+		mailaddr.NormalizeMessageID(msg.MessageID)).Scan(&msgID, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		httpx.JSON(w, http.StatusOK, empty)
 		return

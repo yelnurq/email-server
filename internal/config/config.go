@@ -60,6 +60,22 @@ type Config struct {
 	MailClientHost     string
 	MailClientSMTPPort string
 	MailClientIMAPPort string
+
+	// Public platform identity (V4 §100): configured once, never assembled
+	// ad hoc in the frontend or hardcoded in checks (§17).
+	//
+	// PublicAppURL is the browser-facing base URL of the web app.
+	PublicAppURL string
+	// MailHostname is the platform's mail host: the expected MX target and
+	// the PTR expectation for the outbound IP.
+	MailHostname string
+	// OutboundIP is the public sending IP (SPF ip4 mechanism, PTR check).
+	// Empty in local development — PTR checks report "not applicable".
+	OutboundIP string
+	// DNSResolverAddr overrides the DNS server used by the verification
+	// subsystem ("host:port"); empty uses the system resolver. Point it at a
+	// controlled fixture for integration tests (§123).
+	DNSResolverAddr string
 }
 
 // Load reads configuration from the environment, optionally seeded by a .env
@@ -100,6 +116,11 @@ func Load() (*Config, error) {
 		MailClientHost:     getEnv("MAIL_CLIENT_HOST", "localhost"),
 		MailClientSMTPPort: getEnv("MAIL_CLIENT_SMTP_PORT", "1587"),
 		MailClientIMAPPort: getEnv("MAIL_CLIENT_IMAP_PORT", "1993"),
+
+		PublicAppURL:    getEnv("PUBLIC_APP_URL", "http://localhost:3000"),
+		MailHostname:    getEnv("MAIL_HOSTNAME", "mail.company.test"),
+		OutboundIP:      os.Getenv("OUTBOUND_IP"),
+		DNSResolverAddr: os.Getenv("DNS_RESOLVER_ADDR"),
 	}
 
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {

@@ -26,7 +26,7 @@ type draftRequest struct {
 	Text    string   `json:"text"`
 }
 
-func (h *Handlers) renderDraft(id *auth.Identity, mb *messages.SenderMailbox, req draftRequest) []byte {
+func (h *Handlers) renderDraft(id *auth.Identity, mb *messages.SenderMailbox, req draftRequest, rfcID string) []byte {
 	return mailservice.BuildMessage(mailservice.Envelope{
 		From:        mb.Address,
 		FromDisplay: id.DisplayName,
@@ -34,6 +34,7 @@ func (h *Handlers) renderDraft(id *auth.Identity, mb *messages.SenderMailbox, re
 		Cc:          req.Cc,
 		Subject:     req.Subject,
 		Date:        time.Now().UTC(),
+		RFCID:       rfcID,
 		Text:        req.Text,
 	})
 }
@@ -49,7 +50,11 @@ func (h *Handlers) CreateDraft(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusBadRequest, "INVALID_BODY", err.Error())
 		return
 	}
-	draftID, err := h.Mail.SaveDraft(r.Context(), mb.Address, "", h.renderDraft(id, mb, req))
+	// Every draft carries a Message-ID from birth: it keeps its identity
+	// across saves (each save is a new store object) and lets reconciliation
+	// recognize stale copies left by a failed destroy.
+	rfcID := messages.NewRFCMessageID(mb.Domain)
+	draftID, err := h.Mail.SaveDraft(r.Context(), mb.Address, "", h.renderDraft(id, mb, req, rfcID))
 	if err != nil {
 		h.storeError(w, r, err)
 		return
@@ -68,7 +73,14 @@ func (h *Handlers) UpdateDraft(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusBadRequest, "INVALID_BODY", err.Error())
 		return
 	}
-	draftID, err := h.Mail.SaveDraft(r.Context(), mb.Address, chi.URLParam(r, "id"), h.renderDraft(id, mb, req))
+	previousID := chi.URLParam(r, "id")
+	// Reuse the draft's Message-ID so all saves share one identity; a draft
+	// created before V4 (or an unreadable previous copy) gets a fresh id.
+	rfcID, err := h.Mail.MessageIDOf(r.Context(), mb.Address, previousID)
+	if err != nil || rfcID == "" {
+		rfcID = messages.NewRFCMessageID(mb.Domain)
+	}
+	draftID, err := h.Mail.SaveDraft(r.Context(), mb.Address, previousID, h.renderDraft(id, mb, req, rfcID))
 	if err != nil {
 		h.storeError(w, r, err)
 		return

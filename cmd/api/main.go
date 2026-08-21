@@ -28,6 +28,7 @@ import (
 	"github.com/yelnurq/email-server/internal/collab"
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/departments"
+	"github.com/yelnurq/email-server/internal/dnscheck"
 	"github.com/yelnurq/email-server/internal/domains"
 	"github.com/yelnurq/email-server/internal/emailapi"
 	"github.com/yelnurq/email-server/internal/events"
@@ -181,7 +182,12 @@ func run() error {
 	// Provisioning jobs run in-process here: the control plane owns the
 	// desired state and the API is the only writer of these rows.
 	go provisioner.RunJobs(ctx)
-	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner}
+	domainHandlers := &domains.Handlers{
+		Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner,
+		DNSChecker:   &dnscheck.Checker{Resolver: dnscheck.NewNetResolver(cfg.DNSResolverAddr, 5*time.Second)},
+		MailHostname: cfg.MailHostname,
+		OutboundIP:   cfg.OutboundIP,
+	}
 	departmentHandlers := &departments.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	collabHandlers := &collab.Handlers{Pool: pool, NATS: nc, Log: log}
 	userHandlers := &users.Handlers{Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner}
@@ -222,6 +228,10 @@ func run() error {
 					Post("/domains", domainHandlers.Create)
 				admin.With(auth.RequirePermission("domains.manage")).
 					Post("/domains/{id}/provision", domainHandlers.Provision)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Get("/domains/{id}/dns", domainHandlers.DNS)
+				admin.With(auth.RequirePermission("domains.manage")).
+					Post("/domains/{id}/dns/recheck", domainHandlers.RecheckDNS)
 
 				admin.With(auth.RequirePermission("users.manage")).
 					Get("/users", userHandlers.List)

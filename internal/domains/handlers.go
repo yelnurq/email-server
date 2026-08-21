@@ -1,9 +1,12 @@
-// Package domains manages mail domains. In Phase 1 only development-mode
-// domains are provisioned (verification bypassed by explicit design); the
-// dns verification path ships with the internet SMTP phase.
+// Package domains manages mail domains: creation, mail-core provisioning
+// and DNS verification. development-mode domains bypass verification (local
+// platform only); dns-mode domains prove ownership through the _mailplatform
+// TXT record plus a platform MX, checked by internal/dnscheck, and are
+// provisioned into the mail core only after that proof (V4 §11-16).
 package domains
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -12,6 +15,7 @@ import (
 
 	"github.com/yelnurq/email-server/internal/audit"
 	"github.com/yelnurq/email-server/internal/auth"
+	"github.com/yelnurq/email-server/internal/dnscheck"
 	"github.com/yelnurq/email-server/internal/httpx"
 	"github.com/yelnurq/email-server/internal/mailaddr"
 	"github.com/yelnurq/email-server/internal/mailcore"
@@ -22,6 +26,15 @@ type Handlers struct {
 	Audit       *audit.Logger
 	Log         *slog.Logger
 	Provisioner *mailcore.Provisioner
+
+	// DNS verification (V4 §11): the checker plus the platform identity the
+	// expected records are built from (§17 — configuration, not hardcoded).
+	DNSChecker   *dnscheck.Checker
+	MailHostname string
+	OutboundIP   string
+	// DKIM reports the domain's active selector/public key for the DKIM
+	// record check; nil until DKIM key management is wired.
+	DKIM func(ctx context.Context, domainID string) (selector, publicKey string)
 }
 
 type Domain struct {
@@ -125,11 +138,11 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	var d Domain
 	err = h.Pool.QueryRow(r.Context(), `
-		INSERT INTO domains (tenant_id, organization_id, name, status, verification_mode)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO domains (tenant_id, organization_id, name, status, verification_mode, verification_token)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (name) DO NOTHING
 		RETURNING id, organization_id, name, status, verification_mode, created_at::text`,
-		id.TenantID, orgID, name, status, mode).
+		id.TenantID, orgID, name, status, mode, newVerificationToken()).
 		Scan(&d.ID, &d.OrganizationID, &d.Name, &d.Status, &d.VerificationMode, &d.CreatedAt)
 	if err != nil {
 		httpx.Error(w, r, http.StatusConflict, "DOMAIN_EXISTS", "This domain is already registered")
@@ -141,8 +154,14 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		Detail: map[string]any{"name": d.Name, "mode": mode},
 	})
 	// Mail-core provisioning is asynchronous: a job is enqueued and the
-	// worker drives it with retries. The UI polls the status.
-	d.ProvisioningStatus = h.Provisioner.Enqueue(r.Context(), "domain", id.TenantID, d.ID, id.UserID)
+	// worker drives it with retries; the UI polls the status. A dns-mode
+	// domain is NOT provisioned until ownership is proven (§16) — the
+	// verified transition in RecheckDNS enqueues the job.
+	if d.Status == "verified" {
+		d.ProvisioningStatus = h.Provisioner.Enqueue(r.Context(), "domain", id.TenantID, d.ID, id.UserID)
+	} else {
+		d.ProvisioningStatus = "pending"
+	}
 	httpx.JSON(w, http.StatusCreated, d)
 }
 

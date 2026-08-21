@@ -200,8 +200,11 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 			if parentThread != nil {
 				threadID = *parentThread
 			}
-			inReplyToRFC = parentRFC
-			referencesIDs = strings.TrimSpace(parentRefs + " " + parentRFC)
+			// Canonical Message-ID chain: normalized, deduplicated, capped
+			// (thread root kept, middle trimmed — RFC 5322 App. B).
+			inReplyToRFC = mailaddr.NormalizeMessageID(parentRFC)
+			refs := mailaddr.AppendReference(mailaddr.ParseMessageIDList(parentRefs), parentRFC)
+			referencesIDs = strings.Join(refs, " ")
 		}
 	}
 	if threadID == "" {
