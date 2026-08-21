@@ -1,6 +1,9 @@
-// Package delivery implements the local routing and delivery worker: it
-// consumes email.accepted events from JetStream and delivers messages into
-// recipient mailboxes (direct addresses and alias targets) idempotently.
+// Package delivery implements the routing and delivery worker: it consumes
+// email.accepted events from JetStream and delivers messages into the
+// authoritative mail store (ADR-003). Local recipients receive an
+// Email/import into their Stalwart mailbox (Inbox or Junk per security
+// verdict), the sender gets a Sent copy the same way, and remote recipients
+// are relayed through the mail core's SMTP submission queue.
 package delivery
 
 import (
@@ -16,20 +19,49 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/yelnurq/email-server/internal/events"
+	"github.com/yelnurq/email-server/internal/mailcore"
+	"github.com/yelnurq/email-server/internal/mailservice"
 	"github.com/yelnurq/email-server/internal/security"
+	"github.com/yelnurq/email-server/internal/storage"
 )
 
 const (
 	consumerName = "delivery"
-	maxDeliver   = 5
-	nakDelay     = 5 * time.Second
+	// Delivery now depends on the mail store being reachable, so retries
+	// must outlast a realistic restart or outage: exponential backoff from
+	// 5s reaches ~1h of total tolerance over 10 attempts.
+	maxDeliver   = 10
+	baseNakDelay = 5 * time.Second
+	maxNakDelay  = 15 * time.Minute
+	// ackWait covers rendering plus mail-store imports and SMTP submission
+	// for every recipient of one message.
+	ackWait = 60 * time.Second
 )
 
-// Worker consumes accepted messages and routes them locally.
+// nakBackoff grows the redelivery delay with the attempt count. The first
+// retry is quick so a message sent moments after a mailbox was created
+// lands as soon as its provisioning job completes.
+func nakBackoff(attempt uint64) time.Duration {
+	if attempt <= 1 {
+		return 2 * time.Second
+	}
+	d := baseNakDelay
+	for i := uint64(1); i < attempt && d < maxNakDelay; i++ {
+		d *= 2
+	}
+	if d > maxNakDelay {
+		d = maxNakDelay
+	}
+	return d
+}
+
+// Worker consumes accepted messages and routes them into the mail store.
 type Worker struct {
-	Pool *pgxpool.Pool
-	NATS *nats.Conn
-	Log  *slog.Logger
+	Pool  *pgxpool.Pool
+	NATS  *nats.Conn
+	Log   *slog.Logger
+	Mail  *mailservice.Service
+	Store storage.ObjectStore
 }
 
 // Run subscribes the durable consumer and blocks until ctx is cancelled.
@@ -41,11 +73,41 @@ func (w *Worker) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sub, err := js.PullSubscribe(events.SubjectAccepted, consumerName,
-		nats.AckExplicit(),
-		nats.MaxDeliver(maxDeliver),
-		nats.AckWait(30*time.Second),
-	)
+	// Reconcile the durable consumer: delivery now performs network I/O
+	// (mail-store imports, SMTP submission), so it needs a longer ack wait
+	// than earlier versions configured. PullSubscribe refuses to attach to a
+	// consumer whose stored config differs, so update it first.
+	wantCfg := &nats.ConsumerConfig{
+		Durable:       consumerName,
+		AckPolicy:     nats.AckExplicitPolicy,
+		MaxDeliver:    maxDeliver,
+		AckWait:       ackWait,
+		FilterSubject: events.SubjectAccepted,
+	}
+	// AckWait cannot always be changed in place (JetStream rejects the
+	// update on some server versions). Bind to whatever config the durable
+	// consumer actually has rather than refusing to start: an existing
+	// consumer with a shorter ack wait is safe, only less forgiving.
+	bindExisting := false
+	if info, err := js.ConsumerInfo(events.StreamName, consumerName); err == nil {
+		bindExisting = true
+		if info.Config.AckWait != ackWait || info.Config.MaxDeliver != maxDeliver {
+			if _, err := js.UpdateConsumer(events.StreamName, wantCfg); err != nil {
+				w.Log.Warn("keeping existing delivery consumer config",
+					slog.String("ack_wait", info.Config.AckWait.String()),
+					slog.String("error", err.Error()))
+			}
+		}
+	}
+	opts := []nats.SubOpt{nats.Bind(events.StreamName, consumerName)}
+	if !bindExisting {
+		opts = []nats.SubOpt{
+			nats.AckExplicit(),
+			nats.MaxDeliver(maxDeliver),
+			nats.AckWait(ackWait),
+		}
+	}
+	sub, err := js.PullSubscribe(events.SubjectAccepted, consumerName, opts...)
 	if err != nil {
 		return err
 	}
@@ -99,18 +161,28 @@ func (w *Worker) handle(ctx context.Context, m *nats.Msg) {
 			_ = m.Term()
 			return
 		}
-		log.Warn("delivery attempt failed, will retry", slog.String("error", err.Error()))
-		_ = m.NakWithDelay(nakDelay)
+		var attempt uint64 = 1
+		if meta != nil {
+			attempt = meta.NumDelivered
+		}
+		delay := nakBackoff(attempt)
+		log.Warn("delivery attempt failed, will retry",
+			slog.String("error", err.Error()), slog.Duration("retry_in", delay))
+		_ = m.NakWithDelay(delay)
 	}
 }
 
 var errPermanent = errors.New("permanent failure")
 
-// deliver routes one accepted message. Fully idempotent: redelivery skips
-// recipients that are no longer pending and mailbox copies conflict-away on
-// the (mailbox_id, message_id, folder_id) unique constraint. The folder is
-// part of the key so a self-addressed message can hold both the sender's
-// Sent copy and the delivered Inbox copy in the same mailbox.
+type recipient struct {
+	id, address string
+}
+
+// deliver routes one accepted message. Recipient rows are the idempotency
+// guard: a redelivery only reprocesses recipients still pending. Mail-store
+// imports are at-least-once — a crash between an import and its status
+// commit can duplicate one mailbox copy on retry, the standard SMTP
+// trade-off (documented in TECH_DEBT).
 func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	tx, err := w.Pool.Begin(ctx)
 	if err != nil {
@@ -118,15 +190,15 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	}
 	defer tx.Rollback(ctx)
 
-	var size int64
 	var status, fromAddress, msgOrgID, subject, bodyText string
+	var sentImported *time.Time
 	err = tx.QueryRow(ctx, `
-		SELECT size_bytes, status, from_address::text, COALESCE(organization_id::text, ''),
-		       subject, body_text
+		SELECT status, from_address::text, COALESCE(organization_id::text, ''),
+		       subject, body_text, sent_imported_at
 		FROM messages
 		WHERE id = $1 AND tenant_id = $2
 		FOR UPDATE`, p.MessageID, p.TenantID).
-		Scan(&size, &status, &fromAddress, &msgOrgID, &subject, &bodyText)
+		Scan(&status, &fromAddress, &msgOrgID, &subject, &bodyText, &sentImported)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errPermanent // message vanished; never deliverable
 	}
@@ -137,9 +209,6 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		return errPermanent
 	}
 
-	type recipient struct {
-		id, address string
-	}
 	rows, err := tx.Query(ctx, `
 		SELECT id, address::text FROM message_recipients
 		WHERE message_id = $1 AND status = 'pending'
@@ -166,7 +235,7 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	_ = tx.QueryRow(ctx,
 		`SELECT organization_id FROM mailboxes WHERE address = $1`, fromAddress).Scan(&senderOrgID)
 
-	// Security verdict decides inbox / spam folder / quarantine.
+	// Security verdict decides inbox / junk folder / quarantine.
 	verdict, err := security.Evaluate(ctx, tx, p.TenantID, fromAddress, subject, bodyText)
 	if err != nil {
 		return err
@@ -176,6 +245,14 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		targetFolder = "spam"
 	}
 
+	// Canonical RFC822 bytes: identical for every local copy, the Sent copy
+	// and the outbound relay.
+	raw, err := mailservice.RenderMessage(ctx, tx, w.Store, p.MessageID)
+	if err != nil {
+		return err
+	}
+
+	var remote []recipient
 	for _, r := range pending {
 		if verdict.Action == security.ActionQuarantine {
 			if err := w.quarantineRecipient(ctx, tx, p, msgOrgID, r.id, r.address, verdict); err != nil {
@@ -188,11 +265,20 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 			return err
 		}
 		if len(targets) == 0 {
-			reason := "no such mailbox"
-			if policyReason != "" {
-				reason = policyReason
+			if policyReason == "" {
+				// Unknown address: local domains reject (unknown user);
+				// foreign domains go to the mail core's outbound queue.
+				local, err := w.isLocalDomain(ctx, tx, r.address)
+				if err != nil {
+					return err
+				}
+				if !local {
+					remote = append(remote, r)
+					continue
+				}
+				policyReason = "no such mailbox"
 			}
-			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, "", "failed", reason); err != nil {
+			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, "", "failed", policyReason); err != nil {
 				return err
 			}
 			continue
@@ -200,15 +286,21 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		deliveredTo := ""
 		var lastErr string
 		for _, t := range targets {
-			ok, reason, err := w.deliverToMailbox(ctx, tx, t, p.MessageID, size, targetFolder)
-			if err != nil {
-				return err
+			if !t.provisioned {
+				// Retry until the provisioning job finishes; the message is
+				// never lost and never wrongly bounced.
+				return errNotProvisioned
 			}
-			if ok {
-				deliveredTo = t
-			} else {
-				lastErr = reason
+			if _, err := w.Mail.Import(ctx, t.address, targetFolder, raw, false); err != nil {
+				if errors.Is(err, mailservice.ErrUnavailable) || errors.Is(err, mailcore.ErrUnavailable) {
+					return err // transient: retry the whole delivery
+				}
+				lastErr = "mail store rejected the message"
+				w.Log.Error("mailbox import failed",
+					slog.String("address", t.address), slog.String("error", err.Error()))
+				continue
 			}
+			deliveredTo = t.mailboxID
 		}
 		if deliveredTo != "" {
 			if err := w.finishRecipient(ctx, tx, p, msgOrgID, r.id, deliveredTo, "delivered", ""); err != nil {
@@ -221,21 +313,61 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 		}
 	}
 
+	// Remote recipients: one submission through the mail core's queue.
+	if len(remote) > 0 {
+		rcpts := make([]string, len(remote))
+		for i, r := range remote {
+			rcpts[i] = r.address
+		}
+		if err := w.Mail.SubmitExternal(ctx, fromAddress, fromAddress, rcpts, raw); err != nil {
+			return err // transient or auth issue: retry with backoff
+		}
+		for _, r := range remote {
+			if err := w.finishRecipientEvent(ctx, tx, p, msgOrgID, r.id, "relayed", "", events.SubjectRelayed); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Sender's Sent copy (once per message).
+	if sentImported == nil {
+		var mbExists bool
+		_ = tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM mailboxes
+			               WHERE address = $1 AND status = 'active'
+			                 AND provisioning_status IN ('active', 'skipped'))`,
+			fromAddress).Scan(&mbExists)
+		if mbExists {
+			if _, err := w.Mail.Import(ctx, fromAddress, "sent", raw, true); err != nil {
+				if errors.Is(err, mailservice.ErrUnavailable) || errors.Is(err, mailcore.ErrUnavailable) {
+					return err
+				}
+				w.Log.Error("sent copy import failed", slog.String("error", err.Error()))
+			} else {
+				if _, err := tx.Exec(ctx,
+					`UPDATE messages SET sent_imported_at = now() WHERE id = $1`, p.MessageID); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	// Final message status from recipient outcomes.
-	var delivered, failed, quarantined int
+	var delivered, relayed, failed, quarantined int
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*) FILTER (WHERE status = 'delivered'),
+		       count(*) FILTER (WHERE status = 'relayed'),
 		       count(*) FILTER (WHERE status = 'failed'),
 		       count(*) FILTER (WHERE status = 'quarantined')
 		FROM message_recipients WHERE message_id = $1`, p.MessageID).
-		Scan(&delivered, &failed, &quarantined); err != nil {
+		Scan(&delivered, &relayed, &failed, &quarantined); err != nil {
 		return err
 	}
 	final := "delivered"
 	switch {
-	case delivered == 0 && quarantined > 0:
+	case delivered+relayed == 0 && quarantined > 0:
 		final = "quarantined"
-	case delivered == 0:
+	case delivered+relayed == 0:
 		final = "failed"
 	case failed > 0 || quarantined > 0:
 		final = "partially_delivered"
@@ -246,42 +378,70 @@ func (w *Worker) deliver(ctx context.Context, p events.AcceptedPayload) error {
 	return tx.Commit(ctx)
 }
 
-// resolveTargets maps an address to local mailbox ids: a direct mailbox,
-// the targets of an active alias, or the members of an active group. Aliases
-// and groups target mailboxes only (no nesting), so resolution depth is 1 and
-// loops are structurally impossible. Unknown addresses return no targets (in
-// Phase 1 there is no internet routing branch yet). policyReason is set when
-// an address exists but a policy (e.g. internal-only group) blocks delivery.
-func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, address, senderOrgID string) (targets []string, policyReason string, err error) {
-	var mailboxID string
+type deliveryTarget struct {
+	mailboxID, address string
+	// provisioned is false while the mailbox account has not been created
+	// in the mail store yet (provisioning runs asynchronously).
+	provisioned bool
+}
+
+// errNotProvisioned means a target mailbox exists in the control plane but
+// its mail-store account is still being provisioned. Delivery retries until
+// the provisioning job completes rather than bouncing the message.
+var errNotProvisioned = errors.New("recipient mailbox is not provisioned yet")
+
+// isLocalDomain reports whether the address's domain is served by this
+// platform (mail domains are globally unique across tenants).
+func (w *Worker) isLocalDomain(ctx context.Context, tx pgx.Tx, address string) (bool, error) {
+	at := strings.LastIndexByte(address, '@')
+	if at < 0 {
+		return false, nil
+	}
+	var exists bool
+	err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM domains WHERE name = $1)`, address[at+1:]).Scan(&exists)
+	return exists, err
+}
+
+// resolveTargets maps an address to local delivery targets: a direct
+// mailbox, the targets of an active alias, or the members of an active
+// group. Aliases and groups target mailboxes only (no nesting), so
+// resolution depth is 1 and loops are structurally impossible. policyReason
+// is set when an address exists but a policy blocks delivery.
+func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, address, senderOrgID string) (targets []deliveryTarget, policyReason string, err error) {
+	var t deliveryTarget
+	var provStatus string
 	err = tx.QueryRow(ctx, `
-		SELECT m.id FROM mailboxes m
+		SELECT m.id, m.address::text, m.provisioning_status FROM mailboxes m
 		JOIN domains d ON d.id = m.domain_id
 		WHERE m.address = $1 AND m.status = 'active' AND d.status = 'verified'`,
-		address).Scan(&mailboxID)
+		address).Scan(&t.mailboxID, &t.address, &provStatus)
 	if err == nil {
-		return []string{mailboxID}, "", nil
+		t.provisioned = provStatus == "active" || provStatus == "skipped"
+		return []deliveryTarget{t}, "", nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, "", err
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT t.mailbox_id
+		SELECT m.id, m.address::text, m.provisioning_status
 		FROM mailbox_aliases a
-		JOIN mailbox_alias_targets t ON t.alias_id = a.id
-		JOIN mailboxes m ON m.id = t.mailbox_id AND m.status = 'active'
+		JOIN mailbox_alias_targets tt ON tt.alias_id = a.id
+		JOIN mailboxes m ON m.id = tt.mailbox_id AND m.status = 'active'
 		WHERE a.address = $1 AND a.status = 'active'`, address)
 	if err != nil {
 		return nil, "", err
 	}
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var t deliveryTarget
+		var ps string
+		if err := rows.Scan(&t.mailboxID, &t.address, &ps); err != nil {
 			rows.Close()
 			return nil, "", err
 		}
-		targets = append(targets, id)
+		t.provisioned = ps == "active" || ps == "skipped"
+		targets = append(targets, t)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -308,7 +468,7 @@ func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, addres
 		return nil, "group accepts internal senders only", nil
 	}
 	gRows, err := tx.Query(ctx, `
-		SELECT gm.mailbox_id
+		SELECT m.id, m.address::text, m.provisioning_status
 		FROM mail_group_members gm
 		JOIN mailboxes m ON m.id = gm.mailbox_id AND m.status = 'active'
 		WHERE gm.group_id = $1`, groupID)
@@ -317,11 +477,13 @@ func (w *Worker) resolveTargets(ctx context.Context, tx pgx.Tx, tenantID, addres
 	}
 	defer gRows.Close()
 	for gRows.Next() {
-		var id string
-		if err := gRows.Scan(&id); err != nil {
+		var t deliveryTarget
+		var ps string
+		if err := gRows.Scan(&t.mailboxID, &t.address, &ps); err != nil {
 			return nil, "", err
 		}
-		targets = append(targets, id)
+		t.provisioned = ps == "active" || ps == "skipped"
+		targets = append(targets, t)
 	}
 	if len(targets) == 0 {
 		return nil, "group has no active members", nil
@@ -367,43 +529,19 @@ func (w *Worker) quarantineRecipient(ctx context.Context, tx pgx.Tx, p events.Ac
 	})
 }
 
-// deliverToMailbox inserts the mailbox copy (inbox or spam) and accounts
-// quota. Returns ok=false with a reason for policy failures (quota).
-func (w *Worker) deliverToMailbox(ctx context.Context, tx pgx.Tx, mailboxID, messageID string, size int64, folderType string) (bool, string, error) {
-	var quota, used int64
-	if err := tx.QueryRow(ctx, `
-		SELECT quota_bytes, used_bytes FROM mailboxes WHERE id = $1 FOR UPDATE`,
-		mailboxID).Scan(&quota, &used); err != nil {
-		return false, "", err
+func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, mailboxID, status, errMsg string) error {
+	eventType := events.SubjectDeliveredLocal
+	if status == "failed" {
+		eventType = events.SubjectFailed
 	}
-	if used+size > quota {
-		return false, "quota exceeded", nil
-	}
-	var inboxID string
-	if err := tx.QueryRow(ctx, `
-		SELECT id FROM folders WHERE mailbox_id = $1 AND type = $2`,
-		mailboxID, folderType).Scan(&inboxID); err != nil {
-		return false, "", err
-	}
-	ct, err := tx.Exec(ctx, `
-		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
-		mailboxID, messageID, inboxID)
-	if err != nil {
-		return false, "", err
-	}
-	if ct.RowsAffected() > 0 {
-		if _, err := tx.Exec(ctx, `
-			UPDATE mailboxes SET used_bytes = used_bytes + $1 WHERE id = $2`,
-			size, mailboxID); err != nil {
-			return false, "", err
-		}
-	}
-	return true, "", nil
+	return w.finishRecipientWith(ctx, tx, p, orgID, recipientID, mailboxID, status, errMsg, eventType)
 }
 
-func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, mailboxID, status, errMsg string) error {
+func (w *Worker) finishRecipientEvent(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, status, errMsg, eventType string) error {
+	return w.finishRecipientWith(ctx, tx, p, orgID, recipientID, "", status, errMsg, eventType)
+}
+
+func (w *Worker) finishRecipientWith(ctx context.Context, tx pgx.Tx, p events.AcceptedPayload, orgID, recipientID, mailboxID, status, errMsg, eventType string) error {
 	var mb *string
 	if mailboxID != "" {
 		mb = &mailboxID
@@ -413,16 +551,14 @@ func (w *Worker) finishRecipient(ctx context.Context, tx pgx.Tx, p events.Accept
 		WHERE id = $4`, status, errMsg, mb, recipientID); err != nil {
 		return err
 	}
-	eventType := events.SubjectDeliveredLocal
 	detail := map[string]any{"recipient_id": recipientID}
-	if status == "failed" {
-		eventType = events.SubjectFailed
+	if errMsg != "" {
 		detail["error"] = errMsg
 	}
-	raw, _ := json.Marshal(detail)
+	rawDetail, _ := json.Marshal(detail)
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO message_events (message_id, type, detail) VALUES ($1, $2, $3)`,
-		p.MessageID, eventType, raw); err != nil {
+		p.MessageID, eventType, rawDetail); err != nil {
 		return err
 	}
 	return events.Enqueue(ctx, tx, eventType, events.DeliveryPayload{

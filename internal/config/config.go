@@ -43,6 +43,18 @@ type Config struct {
 	StalwartAdminUser string
 	StalwartAdminPass string
 
+	// Master credentials let the backend open any account's mailbox over
+	// JMAP/SMTP ("<account>%<master-user>"); never exposed outside the
+	// backend process.
+	StalwartMasterUser string
+	StalwartMasterPass string
+	// StalwartSubmitAddr is the SMTP submission endpoint used for relaying
+	// outbound mail through the mail core's queue.
+	StalwartSubmitAddr string
+	// StalwartInsecureTLS accepts the mail core's self-signed certificate;
+	// development only.
+	StalwartInsecureTLS bool
+
 	// Connection parameters surfaced to users on Settings → Mail clients.
 	// These describe how mail clients reach the mail core from the outside.
 	MailClientHost     string
@@ -80,6 +92,11 @@ func Load() (*Config, error) {
 		StalwartAdminUser: getEnv("STALWART_ADMIN_USER", "admin"),
 		StalwartAdminPass: os.Getenv("STALWART_ADMIN_PASSWORD"),
 
+		StalwartMasterUser:  getEnv("STALWART_MASTER_USER", "master"),
+		StalwartMasterPass:  os.Getenv("STALWART_MASTER_PASSWORD"),
+		StalwartSubmitAddr:  getEnv("STALWART_SUBMIT_ADDR", "localhost:1587"),
+		StalwartInsecureTLS: getEnv("STALWART_INSECURE_TLS", "true") == "true",
+
 		MailClientHost:     getEnv("MAIL_CLIENT_HOST", "localhost"),
 		MailClientSMTPPort: getEnv("MAIL_CLIENT_SMTP_PORT", "1587"),
 		MailClientIMAPPort: getEnv("MAIL_CLIENT_IMAP_PORT", "1993"),
@@ -112,6 +129,9 @@ func Load() (*Config, error) {
 	case "stalwart":
 		if cfg.StalwartBaseURL == "" || cfg.StalwartAdminPass == "" {
 			return nil, fmt.Errorf("MAIL_CORE_PROVIDER=stalwart requires STALWART_BASE_URL and STALWART_ADMIN_PASSWORD")
+		}
+		if cfg.StalwartMasterPass == "" {
+			return nil, fmt.Errorf("MAIL_CORE_PROVIDER=stalwart requires STALWART_MASTER_PASSWORD (unified mail store access)")
 		}
 	default:
 		return nil, fmt.Errorf("MAIL_CORE_PROVIDER must be none or stalwart, got %q", cfg.MailCoreProvider)

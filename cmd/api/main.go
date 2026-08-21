@@ -35,6 +35,7 @@ import (
 	"github.com/yelnurq/email-server/internal/logging"
 	"github.com/yelnurq/email-server/internal/mailbox"
 	"github.com/yelnurq/email-server/internal/mailcore"
+	"github.com/yelnurq/email-server/internal/mailservice"
 	"github.com/yelnurq/email-server/internal/messages"
 	"github.com/yelnurq/email-server/internal/official"
 	"github.com/yelnurq/email-server/internal/organization"
@@ -46,6 +47,7 @@ import (
 	"github.com/yelnurq/email-server/internal/trace"
 	"github.com/yelnurq/email-server/internal/users"
 	"github.com/yelnurq/email-server/internal/webhooks"
+	"github.com/yelnurq/email-server/internal/webmail"
 	"github.com/yelnurq/email-server/internal/worklist"
 
 	"github.com/yelnurq/email-server/internal/httpx"
@@ -57,6 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 
 func run() error {
 	cfg, err := config.Load()
@@ -132,6 +135,20 @@ func run() error {
 	log.Info("mail core provider", slog.String("provider", mailCore.Name()))
 	infra := &server.InfraMonitor{Health: health, Provider: mailCore, TTL: 10 * time.Second}
 
+	// Unified mail store access (ADR-003): webmail reads/writes mailboxes
+	// through JMAP with master-user auth. Without a mail core the JMAP base
+	// URL is empty and every mailbox call fails as "store unavailable",
+	// which webmail surfaces as a friendly status.
+	mailSvc := &mailservice.Service{
+		JMAP: &mailservice.JMAP{
+			BaseURL:      cfg.StalwartBaseURL,
+			MasterUser:   cfg.StalwartMasterUser,
+			MasterSecret: cfg.StalwartMasterPass,
+		},
+		SubmitAddr:        cfg.StalwartSubmitAddr,
+		SubmitInsecureTLS: cfg.StalwartInsecureTLS,
+	}
+
 	// Mail-plane topology and the transactional outbox publisher.
 	if err := events.EnsureStream(nc); err != nil {
 		log.Warn("could not ensure NATS stream at startup; publisher will retry",
@@ -152,7 +169,7 @@ func run() error {
 	}
 
 	messageService := &messages.Service{Pool: pool}
-	webmail := &messages.WebmailHandlers{Svc: messageService, Log: log}
+	webmailHandlers := &webmail.Handlers{Pool: pool, Mail: mailSvc, Accept: messageService, Log: log}
 	attachmentHandlers := &attachments.Handlers{Pool: pool, Store: store, Log: log}
 
 	orgHandlers := &organization.Handlers{Pool: pool, Audit: auditLog, Log: log}
@@ -162,6 +179,9 @@ func run() error {
 	bulkHandlers := &bulkmail.Handlers{Pool: pool, Audit: auditLog}
 	go (&bulkmail.Processor{Pool: pool, Messages: messageService, Audit: auditLog, Log: log}).Run(ctx)
 	provisioner := &mailcore.Provisioner{Pool: pool, Provider: mailCore, Audit: auditLog, Log: log}
+	// Provisioning jobs run in-process here: the control plane owns the
+	// desired state and the API is the only writer of these rows.
+	go provisioner.RunJobs(ctx)
 	domainHandlers := &domains.Handlers{Pool: pool, Audit: auditLog, Log: log, Provisioner: provisioner}
 	departmentHandlers := &departments.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	collabHandlers := &collab.Handlers{Pool: pool, NATS: nc, Log: log}
@@ -171,7 +191,7 @@ func run() error {
 	groupHandlers := &groups.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	apikeyHandlers := &apikeys.Handlers{Pool: pool, Audit: auditLog, Log: log}
 	webhookHandlers := &webhooks.Handlers{Pool: pool, Audit: auditLog, Log: log}
-	securityHandlers := &security.Handlers{Pool: pool, Audit: auditLog, Log: log}
+	securityHandlers := &security.Handlers{Pool: pool, Audit: auditLog, Log: log, Mail: mailSvc, Store: store}
 	smtpCredHandlers := &smtpcreds.Handlers{Pool: pool, Audit: auditLog, Log: log, Provider: mailCore}
 	auditHandlers := &auditapi.Handlers{Pool: pool}
 	traceHandlers := &trace.Handlers{Pool: pool, Log: log}
@@ -342,12 +362,13 @@ func run() error {
 				mail.Use(auth.RequireAuth)
 				mail.Use(auth.RequirePermission("mail.read"))
 
-				mail.Get("/mail/summary", webmail.Summary)
-				mail.Get("/mail/messages", webmail.List)
-				mail.Get("/mail/messages/{id}", webmail.Get)
-				mail.Get("/mail/messages/{id}/events", webmail.Events)
-				mail.Patch("/mail/messages/{id}", webmail.Patch)
-				mail.Delete("/mail/messages/{id}", webmail.Delete)
+				mail.Get("/mail/summary", webmailHandlers.Summary)
+				mail.Get("/mail/messages", webmailHandlers.List)
+				mail.Get("/mail/messages/{id}", webmailHandlers.Get)
+				mail.Get("/mail/messages/{id}/events", webmailHandlers.Events)
+				mail.Patch("/mail/messages/{id}", webmailHandlers.Patch)
+				mail.Delete("/mail/messages/{id}", webmailHandlers.Delete)
+				mail.Get("/mail/blob/{blobID}", webmailHandlers.Blob)
 
 				// Mail client connection parameters (Settings → Mail clients).
 				// Static configuration; passwords are never included.
@@ -367,13 +388,13 @@ func run() error {
 				})
 
 				mail.With(auth.RequirePermission("mail.send")).
-					Post("/mail/send", webmail.Send)
+					Post("/mail/send", webmailHandlers.Send)
 				mail.With(auth.RequirePermission("mail.send")).
-					Post("/mail/drafts", webmail.CreateDraft)
+					Post("/mail/drafts", webmailHandlers.CreateDraft)
 				mail.With(auth.RequirePermission("mail.send")).
-					Put("/mail/drafts/{id}", webmail.UpdateDraft)
+					Put("/mail/drafts/{id}", webmailHandlers.UpdateDraft)
 				mail.With(auth.RequirePermission("mail.send")).
-					Post("/mail/drafts/{id}/send", webmail.SendDraft)
+					Post("/mail/drafts/{id}/send", webmailHandlers.SendDraft)
 
 				mail.With(auth.RequirePermission("mail.send")).
 					Post("/mail/attachments", attachmentHandlers.Upload)

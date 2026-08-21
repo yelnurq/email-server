@@ -140,10 +140,9 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		ResourceType: "domain", ResourceID: d.ID,
 		Detail: map[string]any{"name": d.Name, "mode": mode},
 	})
-	// Push the domain into the mail core. A failure does not undo the local
-	// record: the domain stays with provisioning_status=failed and can be
-	// retried via POST /domains/{id}/provision.
-	d.ProvisioningStatus = h.Provisioner.ProvisionDomain(r.Context(), id.TenantID, d.ID, id.UserID)
+	// Mail-core provisioning is asynchronous: a job is enqueued and the
+	// worker drives it with retries. The UI polls the status.
+	d.ProvisioningStatus = h.Provisioner.Enqueue(r.Context(), "domain", id.TenantID, d.ID, id.UserID)
 	httpx.JSON(w, http.StatusCreated, d)
 }
 
@@ -164,6 +163,6 @@ func (h *Handlers) Provision(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusForbidden, "FORBIDDEN", "Cannot manage another organization")
 		return
 	}
-	status := h.Provisioner.ProvisionDomain(r.Context(), id.TenantID, domainID, id.UserID)
+	status := h.Provisioner.Enqueue(r.Context(), "domain", id.TenantID, domainID, id.UserID)
 	httpx.JSON(w, http.StatusOK, map[string]string{"provisioning_status": status})
 }

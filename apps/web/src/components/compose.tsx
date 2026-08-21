@@ -125,8 +125,11 @@ function ComposerWindow({ opts, onClose }: { opts: ComposeOptions; onClose: () =
   const saveDraft = useCallback(async () => {
     const body = { to: parseAddresses(to), cc: parseAddresses(cc), bcc: parseAddresses(bcc), subject, text };
     try {
+      // Drafts live in the mail store, which has no in-place update: each
+      // save writes a new copy and returns its id, so always adopt it.
       if (draftId) {
-        await api.put(`/api/v1/mail/drafts/${draftId}`, body);
+        const res = await api.put<{ id: string }>(`/api/v1/mail/drafts/${draftId}`, body);
+        if (res?.id) setDraftId(res.id);
       } else {
         const res = await api.post<{ id: string }>("/api/v1/mail/drafts", body);
         setDraftId(res.id);

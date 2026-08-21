@@ -66,3 +66,11 @@ enable = true
 [authentication.fallback-admin]
 user = "admin"
 secret = "%{env:STALWART_ADMIN_SECRET}%"
+
+# Master user: lets the backend (and only the backend) open any account's
+# mailbox over JMAP/IMAP by authenticating as "<account>%<master-user>" with
+# the master secret. This is how the webmail data plane reads the mail store
+# without per-user service passwords. Secret comes from the environment.
+[authentication.master]
+user = "master"
+secret = "%{env:STALWART_MASTER_SECRET}%"

@@ -285,20 +285,8 @@ func (s *Service) insertAccepted(ctx context.Context, tx pgx.Tx, tenantID string
 		return "", "", err
 	}
 
-	// Sender's Sent copy.
-	var sentFolderID string
-	if err := tx.QueryRow(ctx, `
-		SELECT id FROM folders WHERE mailbox_id = $1 AND type = 'sent'`,
-		sender.ID).Scan(&sentFolderID); err != nil {
-		return "", "", err
-	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id, is_read)
-		VALUES ($1, $2, $3, true)
-		ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
-		sender.ID, msgID, sentFolderID); err != nil {
-		return "", "", err
-	}
+	// The sender's Sent copy is imported into the mail store by the delivery
+	// worker (ADR-003) — no mailbox_messages rows are written any more.
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO message_events (message_id, type, detail)

@@ -23,8 +23,12 @@ const (
 
 	SubjectAccepted       = "email.accepted"
 	SubjectDeliveredLocal = "email.delivered_local"
-	SubjectFailed         = "email.failed"
-	SubjectQuarantined    = "email.quarantined"
+	// SubjectRelayed: the message was handed to the mail core's outbound
+	// queue for a remote recipient (MX delivery, retries and bounces are
+	// owned by the mail core from that point).
+	SubjectRelayed     = "email.relayed"
+	SubjectFailed      = "email.failed"
+	SubjectQuarantined = "email.quarantined"
 )
 
 // AcceptedPayload is the body of an email.accepted event.

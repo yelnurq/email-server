@@ -90,6 +90,7 @@ services:
     container_name: mailplatform-stalwart
     environment:
       STALWART_ADMIN_SECRET: ${STALWART_ADMIN_PASSWORD:-stalwart_dev_admin}
+      STALWART_MASTER_SECRET: ${STALWART_MASTER_PASSWORD:-stalwart_dev_master}
     ports:
       - "${STALWART_SMTP_PORT:-2525}:25"
       - "${STALWART_SUBMISSION_PORT:-1587}:587"
@@ -101,7 +102,9 @@ services:
       - stalwartdata:/opt/stalwart
       - ./deploy/stalwart/config.toml:/opt/stalwart/etc/config.toml:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/healthz/live || exit 1"]
+      # The v0.13 image has no curl/wget; bash /dev/tcp + a raw HTTP request
+      # against the liveness endpoint works with what the image ships.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /healthz/live HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q 200"]
       interval: 5s
       timeout: 3s
       retries: 10

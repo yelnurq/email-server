@@ -332,7 +332,10 @@ export function MessagePane({
                 {m.attachments.map((a) => (
                   <li key={a.id}>
                     <a
-                      href={`${API_URL}/api/v1/mail/attachments/${a.id}`}
+                      // Attachments are MIME parts in the mail store; the
+                      // backend streams them by blob id with the display
+                      // metadata carried in the query.
+                      href={`${API_URL}/api/v1/mail/blob/${a.id}?name=${encodeURIComponent(a.filename)}&type=${encodeURIComponent(a.content_type)}`}
                       className="group inline-flex items-center gap-2.5 rounded-[8px] border border-border bg-background px-3 py-2 transition-colors hover:border-border-strong hover:bg-surface-elevated"
                     >
                       <span className="grid h-7 w-7 place-items-center rounded-[6px] border border-border bg-surface-elevated text-muted-foreground">

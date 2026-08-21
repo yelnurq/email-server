@@ -11,6 +11,7 @@ function ProvisioningBadge({ m }: { m: Mailbox }) {
       return <Badge tone="success">Provisioned</Badge>;
     case "skipped":
       return <Badge tone="neutral">No mail core</Badge>;
+    case "pending":
     case "provisioning":
       return <Badge tone="accent">Provisioning…</Badge>;
     case "failed":
@@ -28,6 +29,11 @@ export default function MailboxesPage() {
   const mailboxes = useQuery({
     queryKey: ["admin", "mailboxes"],
     queryFn: () => api.get<{ mailboxes: Mailbox[] }>("/api/v1/mailboxes"),
+    // Provisioning runs asynchronously: poll while any mailbox is in flight.
+    refetchInterval: (query) =>
+      query.state.data?.mailboxes.some((m) => m.provisioning_status === "pending" || m.provisioning_status === "provisioning")
+        ? 3000
+        : false,
   });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "mailboxes"] });

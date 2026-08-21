@@ -15,6 +15,10 @@ PG_CONTAINER="${PG_CONTAINER:-mailplatform-postgres}"
 PG_USER="${POSTGRES_USER:-mailplatform}"
 PG_DB="${POSTGRES_DB:-mailplatform}"
 WEBHOOK_PORT="${WEBHOOK_PORT:-39991}"
+# Mail store (optional): enables the JMAP parity checks.
+STALWART_HTTP="${STALWART_HTTP:-}"
+STALWART_MASTER_PASSWORD="${STALWART_MASTER_PASSWORD:-}"
+STALWART_ADMIN_PASSWORD="${STALWART_ADMIN_PASSWORD:-}"
 
 R="$RANDOM$RANDOM"
 DOMAIN="e2e$R.test"
@@ -97,19 +101,20 @@ MSG_ID=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T1" 
   -H "Content-Type: application/json" \
   -d "{\"to\":[\"$A2\"],\"subject\":\"E2E hello $R\",\"text\":\"pipeline body $R\"}" | jsonval message_id)
 [ -n "$MSG_ID" ] && pass "message accepted" || fail "send failed"
-poll_inbox "$T2" "$MSG_ID" && pass "a2 received via pipeline" || fail "a2 inbox"
+# Mailbox contents live in the mail store (ADR-003): listings are keyed by
+# store ids and carry the RFC Message-ID, so subjects identify messages here.
+poll_inbox "$T2" "E2E hello $R" && pass "a2 received via pipeline" || fail "a2 inbox"
 
-MM_ID=$(curl -s "$API/api/v1/mail/messages?folder=inbox" -H "Authorization: Bearer $T2" \
-  | sed -n "s/.*\"id\":\"\([^\"]*\)\",\"message_id\":\"$MSG_ID\".*/\1/p" | head -1)
+MM_ID=$(curl -s "$API/api/v1/mail/messages?folder=inbox&q=E2E+hello+$R" -H "Authorization: Bearer $T2" | jsonval id)
 st=$(code GET "/api/v1/mail/messages/$MM_ID" "$T2")
 [ "$st" = "200" ] && pass "a2 opened message" || fail "open ($st)"
 
 RMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T2" \
   -H "Content-Type: application/json" \
-  -d "{\"to\":[\"$A1\"],\"subject\":\"Re: E2E hello $R\",\"text\":\"reply\",\"in_reply_to\":\"$MSG_ID\"}" | jsonval message_id)
-poll_inbox "$T1" "$RMSG" && pass "a1 received threaded reply" || fail "reply not delivered"
+  -d "{\"to\":[\"$A1\"],\"subject\":\"Re: E2E hello $R\",\"text\":\"reply\",\"in_reply_to\":\"$MM_ID\"}" | jsonval message_id)
+poll_inbox "$T1" "Re: E2E hello $R" && pass "a1 received threaded reply" || fail "reply not delivered"
 
-curl -s "$API/api/v1/mail/messages?folder=sent" -H "Authorization: Bearer $T1" | grep -q "$MSG_ID" \
+curl -s "$API/api/v1/mail/messages?folder=sent" -H "Authorization: Bearer $T1" | grep -q "E2E hello $R" \
   && pass "a1 Sent copy exists" || fail "Sent copy missing"
 
 # --- 4. Alias + group --------------------------------------------------------
@@ -120,7 +125,7 @@ AL=$(curl -s -X POST "$API/api/v1/aliases" -H "Authorization: Bearer $ADM" \
 ALMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T2" \
   -H "Content-Type: application/json" \
   -d "{\"to\":[\"helpdesk@$DOMAIN\"],\"subject\":\"Alias test $R\",\"text\":\"via alias\"}" | jsonval message_id)
-poll_inbox "$T1" "$ALMSG" && pass "alias delivered to a1" || fail "alias delivery"
+poll_inbox "$T1" "Alias test $R" && pass "alias delivered to a1" || fail "alias delivery"
 
 GR=$(curl -s -X POST "$API/api/v1/groups" -H "Authorization: Bearer $ADM" \
   -H "Content-Type: application/json" \
@@ -129,7 +134,7 @@ GR=$(curl -s -X POST "$API/api/v1/groups" -H "Authorization: Bearer $ADM" \
 GRMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $ADM" \
   -H "Content-Type: application/json" \
   -d "{\"to\":[\"crew@$DOMAIN\"],\"subject\":\"Group test $R\",\"text\":\"fanout\"}" | jsonval message_id)
-poll_inbox "$T1" "$GRMSG" && poll_inbox "$T2" "$GRMSG" \
+poll_inbox "$T1" "Group test $R" && poll_inbox "$T2" "Group test $R" \
   && pass "group fanout reached both members" || fail "group fanout"
 
 # --- 5. Attachments ----------------------------------------------------------
@@ -140,8 +145,14 @@ ATT=$(curl -s -X POST "$API/api/v1/mail/attachments" -H "Authorization: Bearer $
 ATMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T1" \
   -H "Content-Type: application/json" \
   -d "{\"to\":[\"$A2\"],\"subject\":\"With file $R\",\"text\":\"see attached\",\"attachment_ids\":[\"$ATT\"]}" | jsonval message_id)
-poll_inbox "$T2" "$ATMSG" && pass "attachment message delivered" || fail "attachment delivery"
-GOT=$(curl -s "$API/api/v1/mail/attachments/$ATT" -H "Authorization: Bearer $T2")
+poll_inbox "$T2" "With file $R" && pass "attachment message delivered" || fail "attachment delivery"
+# Attachments are MIME parts in the mail store: locate the copy, read its
+# blob id, then stream it back through the backend.
+AT_MM=$(curl -s "$API/api/v1/mail/messages?folder=inbox&q=With+file+$R" -H "Authorization: Bearer $T2" | jsonval id)
+AT_BLOB=$(curl -s "$API/api/v1/mail/messages/$AT_MM" -H "Authorization: Bearer $T2" \
+  | sed -n 's/.*"attachments":\[{"id":"\([^"]*\)".*/\1/p')
+[ -n "$AT_BLOB" ] && pass "attachment visible as a MIME part" || fail "attachment part missing"
+GOT=$(curl -s "$API/api/v1/mail/blob/$AT_BLOB?name=file.txt&type=text/plain" -H "Authorization: Bearer $T2")
 [ "$GOT" = "attachment payload $R" ] && pass "recipient downloaded exact content" || fail "attachment download"
 
 # --- 6. Email API + idempotency ---------------------------------------------
@@ -164,7 +175,7 @@ st=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/v1/emails" \
   -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
   -H "Idempotency-Key: e2e-$R" -d "{\"from\":\"$ADMIN_EMAIL\",\"to\":[\"$A1\"],\"subject\":\"DIFF\",\"text\":\"x\"}")
 [ "$st" = "409" ] && pass "idempotency payload conflict → 409" || fail "idempotency conflict ($st)"
-poll_inbox "$T1" "$APIMSG" && pass "API message delivered to inbox" || fail "API delivery"
+poll_inbox "$T1" "API $R" && pass "API message delivered to inbox" || fail "API delivery"
 curl -s "$API/api/v1/emails/$APIMSG/events" -H "Authorization: Bearer $SECRET" \
   | grep -q "email.delivered_local" && pass "delivery events readable via API" || fail "events endpoint"
 curl -s -X DELETE "$API/api/v1/api-keys/$KEYID" -H "Authorization: Bearer $ADM" > /dev/null
@@ -176,7 +187,7 @@ st=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/api/v1/emails" \
 SPMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T2" \
   -H "Content-Type: application/json" \
   -d "{\"to\":[\"$A1\"],\"subject\":\"[SPAM-TEST] offer $R\",\"text\":\"spam\"}" | jsonval message_id)
-poll_inbox "$T1" "$SPMSG" spam && pass "spam-marked mail landed in Spam" || fail "spam routing"
+poll_inbox "$T1" "SPAM-TEST] offer $R" spam && pass "spam-marked mail landed in Spam" || fail "spam routing"
 
 QMSG=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T2" \
   -H "Content-Type: application/json" \
@@ -189,18 +200,32 @@ for _ in $(seq 1 15); do
   sleep 1
 done
 [ -n "$QID" ] && pass "quarantine holds the marked message" || fail "quarantine intake"
-if curl -s "$API/api/v1/mail/messages?folder=inbox" -H "Authorization: Bearer $T1" | grep -q "$QMSG"; then
+if curl -s "$API/api/v1/mail/messages?folder=inbox" -H "Authorization: Bearer $T1" | grep -q "QUARANTINE-TEST] bad $R"; then
   fail "quarantined message leaked into inbox"
 else
   pass "quarantined message absent from inbox"
 fi
 st=$(code POST "/api/v1/quarantine/$QID/release" "$ADM")
-[ "$st" = "200" ] && poll_inbox "$T1" "$QMSG" \
+[ "$st" = "200" ] && poll_inbox "$T1" "QUARANTINE-TEST] bad $R" \
   && pass "release delivered held message to inbox" || fail "quarantine release"
 
 # --- 8. Isolation & RBAC -----------------------------------------------------
-st=$(code GET "/api/v1/mail/messages/$MM_ID" "$T1")
-[ "$st" = "404" ] && pass "a1 cannot read a2's mailbox copy" || fail "mailbox isolation ($st)"
+# Mailbox ids are per-account in the mail store (ADR-003), so a foreign id is
+# not globally unique: it either misses or resolves to the caller's OWN
+# message. The guarantee under test is therefore content-based, using a
+# message a1 has no copy of at all (admin → a2 only).
+SECRET_BODY="isolation-secret-$R"
+curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $ADM" \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":[\"$A2\"],\"subject\":\"Private $R\",\"text\":\"$SECRET_BODY\"}" > /dev/null
+poll_inbox "$T2" "Private $R" || fail "isolation probe not delivered"
+PRIV_ID=$(curl -s "$API/api/v1/mail/messages?folder=inbox&q=Private+$R" -H "Authorization: Bearer $T2" | jsonval id)
+LEAK=$(curl -s "$API/api/v1/mail/messages/$PRIV_ID" -H "Authorization: Bearer $T1")
+if printf '%s' "$LEAK" | grep -q "$SECRET_BODY"; then
+  fail "mailbox isolation: a1 read a2's private message content"
+else
+  pass "a1 cannot read a2's mailbox content"
+fi
 st=$(code GET /api/v1/users "$T1")
 [ "$st" = "403" ] && pass "member blocked from admin API" || fail "member RBAC ($st)"
 
@@ -279,6 +304,49 @@ SELF=$(curl -s -X POST "$API/api/v1/mail/send" -H "Authorization: Bearer $T1" \
 [ -n "$SELF" ] && pass "self-mail accepted" || fail "self-mail send"
 poll_inbox "$T1" "selfmail $R" inbox && pass "self-mail in Inbox" || fail "self-mail missing from Inbox"
 poll_inbox "$T1" "selfmail $R" sent && pass "self-mail in Sent" || fail "self-mail missing from Sent"
+
+# --- 10b. Unified mail store: webmail == JMAP, flags round-trip --------------
+# A mailbox is one store; webmail ids are store ids. Prove the recipient's
+# webmail copy is the very object JMAP serves, and that a flag set through
+# webmail is visible over JMAP (and therefore to IMAP clients).
+SELF_MM=$(curl -s "$API/api/v1/mail/messages?folder=inbox&q=selfmail+$R" -H "Authorization: Bearer $T1" | jsonval id)
+SELF_RFC=$(curl -s "$API/api/v1/mail/messages?folder=inbox&q=selfmail+$R" -H "Authorization: Bearer $T1" | jsonval message_id)
+[ -n "$SELF_MM" ] && pass "webmail exposes mail-store ids" || fail "no store id in listing"
+
+curl -s -X PATCH "$API/api/v1/mail/messages/$SELF_MM" -H "Authorization: Bearer $T1" \
+  -H "Content-Type: application/json" -d '{"is_starred":true}' > /dev/null
+
+# JMAP account ids are the principal id in Stalwart's codec: big-endian
+# base32 over 'a'-'z','0'-'5' (see ADR-003).
+jmap_account_id() {
+  awk -v n="$1" 'BEGIN{
+    alpha="abcdefghijklmnopqrstuvwxyz012345";
+    if (n==0) { print "a"; exit }
+    s="";
+    while (n>0) { s=substr(alpha,(n%32)+1,1) s; n=int(n/32) }
+    print s
+  }'
+}
+JMAP_ACCOUNT=""
+if [ -n "$STALWART_HTTP" ] && [ -n "${STALWART_ADMIN_PASSWORD:-}" ]; then
+  PRINCIPAL_ID=$(curl -s -u "admin:$STALWART_ADMIN_PASSWORD" "$STALWART_HTTP/api/principal/$A1" \
+    | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -1)
+  [ -n "$PRINCIPAL_ID" ] && JMAP_ACCOUNT=$(jmap_account_id "$PRINCIPAL_ID")
+fi
+
+if [ -n "$STALWART_HTTP" ] && [ -n "$STALWART_MASTER_PASSWORD" ] && [ -n "$JMAP_ACCOUNT" ]; then
+  JMAP_BODY="{\"using\":[\"urn:ietf:params:jmap:core\",\"urn:ietf:params:jmap:mail\"],\"methodCalls\":[[\"Email/get\",{\"accountId\":\"$JMAP_ACCOUNT\",\"ids\":[\"$SELF_MM\"],\"properties\":[\"id\",\"messageId\",\"keywords\"]},\"0\"]]}"
+  JMAP_OUT=$(curl -s -u "$A1%master:$STALWART_MASTER_PASSWORD" -H "Content-Type: application/json" \
+    -d "$JMAP_BODY" "$STALWART_HTTP/jmap/")
+  printf '%s' "$JMAP_OUT" | grep -q "$SELF_MM" \
+    && pass "JMAP returns the same message id as webmail" || fail "JMAP id mismatch"
+  printf '%s' "$JMAP_OUT" | grep -q '\$flagged' \
+    && pass "webmail star visible over JMAP (flag sync)" || fail "flag not synced to JMAP"
+  printf '%s' "$JMAP_OUT" | grep -q "$(printf '%s' "$SELF_RFC" | sed 's/[]\/$*.^[]/\\&/g')" \
+    && pass "same RFC Message-ID in webmail and JMAP" || fail "Message-ID mismatch"
+else
+  say "  SKIP: mail-store credentials unset, JMAP parity checks skipped"
+fi
 
 # --- 11. Message trace + delivery events -------------------------------------
 tr_status=$(curl -s "$API/api/v1/admin/messages?q=$SELF" -H "Authorization: Bearer $ADM" | jsonval status)

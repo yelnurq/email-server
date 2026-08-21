@@ -147,9 +147,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		TenantID: id.TenantID, ActorUserID: id.UserID, Action: "mailbox.create",
 		ResourceType: "mailbox", ResourceID: mailboxID,
 	})
-	// Provision the account in the mail core; a failure keeps the local
-	// mailbox with provisioning_status=failed (retryable).
-	provStatus := h.Provisioner.ProvisionMailbox(r.Context(), id.TenantID, mailboxID, id.UserID)
+	// Mail-core provisioning is asynchronous (job + worker with retries).
+	provStatus := h.Provisioner.Enqueue(r.Context(), "mailbox", id.TenantID, mailboxID, id.UserID)
 	httpx.JSON(w, http.StatusCreated, map[string]string{
 		"id": mailboxID, "provisioning_status": provStatus,
 	})
@@ -263,7 +262,7 @@ func (h *Handlers) Patch(w http.ResponseWriter, r *http.Request) {
 			}
 			// Re-ensure the account so quota/description are current. Mail
 			// client passwords are NOT restored: issue new SMTP credentials.
-			h.Provisioner.ProvisionMailbox(r.Context(), id.TenantID, mailboxID, id.UserID)
+			h.Provisioner.Enqueue(r.Context(), "mailbox", id.TenantID, mailboxID, id.UserID)
 			h.Audit.Record(r.Context(), audit.Entry{
 				TenantID: id.TenantID, ActorUserID: id.UserID, Action: "mailbox.enable",
 				ResourceType: "mailbox", ResourceID: mailboxID,
@@ -284,6 +283,6 @@ func (h *Handlers) Provision(w http.ResponseWriter, r *http.Request) {
 	if _, _, _, ok := h.lookup(w, r, mailboxID); !ok {
 		return
 	}
-	status := h.Provisioner.ProvisionMailbox(r.Context(), id.TenantID, mailboxID, id.UserID)
+	status := h.Provisioner.Enqueue(r.Context(), "mailbox", id.TenantID, mailboxID, id.UserID)
 	httpx.JSON(w, http.StatusOK, map[string]string{"provisioning_status": status})
 }

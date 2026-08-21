@@ -31,30 +31,42 @@ import (
 func main() {
 	smtpAddr := flag.String("smtp", "localhost:1587", "SMTP submission host:port (STARTTLS)")
 	httpBase := flag.String("http", "http://localhost:8180", "mail core HTTP base URL (JMAP)")
+	imapAddr := flag.String("imap", "", "IMAPS host:port; when set, run the IMAP checks instead")
 	from := flag.String("from", "", "sender address (SMTP AUTH login)")
 	fromPass := flag.String("from-pass", "", "sender password (SMTP credential)")
 	to := flag.String("to", "", "recipient address")
 	toPass := flag.String("to-pass", "", "recipient password for JMAP verification (optional)")
+	subject := flag.String("subject", "", "IMAP mode: subject to locate")
+	setFlag := flag.String("imap-set-flag", "", "IMAP mode: flag to add to the located message (e.g. \\Flagged)")
 	insecure := flag.Bool("insecure", true, "skip TLS verification (self-signed dev certificate)")
 	flag.Parse()
+
+	// IMAP mode: inspect (and optionally flag) a message in the unified store.
+	if *imapAddr != "" {
+		if err := imapCheck(*imapAddr, *to, *toPass, *subject, *setFlag, *insecure); err != nil {
+			fmt.Fprintf(os.Stderr, "IMAP FAIL: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if *from == "" || *fromPass == "" || *to == "" {
 		fmt.Fprintln(os.Stderr, "usage: mailcheck -from <addr> -from-pass <pw> -to <addr> [-to-pass <pw>]")
 		os.Exit(2)
 	}
 
-	subject := fmt.Sprintf("mailcheck %d", time.Now().UTC().UnixNano())
-	if err := submit(*smtpAddr, *from, *fromPass, *to, subject, *insecure); err != nil {
+	probeSubject := fmt.Sprintf("mailcheck %d", time.Now().UTC().UnixNano())
+	if err := submit(*smtpAddr, *from, *fromPass, *to, probeSubject, *insecure); err != nil {
 		fmt.Fprintf(os.Stderr, "SMTP FAIL: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("SMTP OK: message accepted for %s (subject %q)\n", *to, subject)
+	fmt.Printf("SMTP OK: message accepted for %s (subject %q)\n", *to, probeSubject)
 
 	if *toPass == "" {
 		fmt.Println("JMAP SKIPPED: no -to-pass provided")
 		return
 	}
-	if err := verifyJMAP(*httpBase, *to, *toPass, subject); err != nil {
+	if err := verifyJMAP(*httpBase, *to, *toPass, probeSubject); err != nil {
 		fmt.Fprintf(os.Stderr, "JMAP FAIL: %v\n", err)
 		os.Exit(1)
 	}

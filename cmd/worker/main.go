@@ -16,6 +16,8 @@ import (
 	"github.com/yelnurq/email-server/internal/config"
 	"github.com/yelnurq/email-server/internal/delivery"
 	"github.com/yelnurq/email-server/internal/logging"
+	"github.com/yelnurq/email-server/internal/mailservice"
+	"github.com/yelnurq/email-server/internal/storage"
 	"github.com/yelnurq/email-server/internal/webhooks"
 )
 
@@ -63,7 +65,29 @@ func run() error {
 		}
 	}()
 
-	w := &delivery.Worker{Pool: pool, NATS: nc, Log: log}
+	// Mail store access: the worker delivers into Stalwart mailboxes and
+	// relays remote recipients through its submission queue (ADR-003).
+	store, err := storage.NewS3Store(ctx, storage.Config{
+		Endpoint:  cfg.S3Endpoint,
+		AccessKey: cfg.S3AccessKey,
+		SecretKey: cfg.S3SecretKey,
+		Region:    cfg.S3Region,
+		Bucket:    cfg.S3BucketAttachments,
+	})
+	if err != nil {
+		return err
+	}
+	mailSvc := &mailservice.Service{
+		JMAP: &mailservice.JMAP{
+			BaseURL:      cfg.StalwartBaseURL,
+			MasterUser:   cfg.StalwartMasterUser,
+			MasterSecret: cfg.StalwartMasterPass,
+		},
+		SubmitAddr:        cfg.StalwartSubmitAddr,
+		SubmitInsecureTLS: cfg.StalwartInsecureTLS,
+	}
+
+	w := &delivery.Worker{Pool: pool, NATS: nc, Log: log, Mail: mailSvc, Store: store}
 	log.Info("worker started")
 	workerErr := make(chan error, 1)
 	go func() {

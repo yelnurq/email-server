@@ -13,6 +13,7 @@ function ProvisioningBadge({ d, onRetry, retrying }: { d: Domain; onRetry: () =>
       return <Badge tone="success">Provisioned</Badge>;
     case "skipped":
       return <Badge tone="neutral">No mail core</Badge>;
+    case "pending":
     case "provisioning":
       return <Badge tone="accent">Provisioning…</Badge>;
     case "failed":
@@ -47,6 +48,11 @@ export default function DomainsPage() {
   const domains = useQuery({
     queryKey: ["admin", "domains"],
     queryFn: () => api.get<{ domains: Domain[] }>("/api/v1/domains"),
+    // Provisioning runs asynchronously: poll while any domain is in flight.
+    refetchInterval: (query) =>
+      query.state.data?.domains.some((d) => d.provisioning_status === "pending" || d.provisioning_status === "provisioning")
+        ? 3000
+        : false,
   });
 
   const orgName = (id: string) => orgs.data?.organizations.find((o) => o.id === id)?.name ?? id.slice(0, 8);

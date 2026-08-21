@@ -14,6 +14,8 @@ import (
 	"github.com/yelnurq/email-server/internal/auth"
 	"github.com/yelnurq/email-server/internal/httpx"
 	"github.com/yelnurq/email-server/internal/mailaddr"
+	"github.com/yelnurq/email-server/internal/mailservice"
+	"github.com/yelnurq/email-server/internal/storage"
 )
 
 // Handlers exposes the Security Center: quarantine and sender blocks.
@@ -21,6 +23,8 @@ type Handlers struct {
 	Pool  *pgxpool.Pool
 	Audit *audit.Logger
 	Log   *slog.Logger
+	Mail  *mailservice.Service
+	Store storage.ObjectStore
 }
 
 type quarantineView struct {
@@ -98,17 +102,24 @@ func (h *Handlers) Release(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusConflict, "NO_MAILBOX", "The recipient mailbox no longer exists")
 		return
 	}
-	var inboxID string
+	var mailboxAddress string
 	if err := tx.QueryRow(r.Context(),
-		`SELECT id FROM folders WHERE mailbox_id = $1 AND type = 'inbox'`, *mailboxID).Scan(&inboxID); err != nil {
+		`SELECT address::text FROM mailboxes WHERE id = $1`, *mailboxID).Scan(&mailboxAddress); err != nil {
 		httpx.Internal(w, r)
 		return
 	}
-	if _, err := tx.Exec(r.Context(), `
-		INSERT INTO mailbox_messages (mailbox_id, message_id, folder_id)
-		VALUES ($1, $2, $3) ON CONFLICT (mailbox_id, message_id, folder_id) DO NOTHING`,
-		*mailboxID, messageID, inboxID); err != nil {
+	// Reconstruct the canonical message and deliver it into the recipient's
+	// mailbox in the mail store (ADR-003).
+	raw, err := mailservice.RenderMessage(r.Context(), tx, h.Store, messageID)
+	if err != nil {
+		h.Log.Error("quarantine release render failed", slog.String("error", err.Error()))
 		httpx.Internal(w, r)
+		return
+	}
+	if _, err := h.Mail.Import(r.Context(), mailboxAddress, "inbox", raw, false); err != nil {
+		h.Log.Error("quarantine release import failed", slog.String("error", err.Error()))
+		httpx.Error(w, r, http.StatusBadGateway, "MAIL_SERVICE_UNAVAILABLE",
+			"The mail service did not accept the message; try again")
 		return
 	}
 	if _, err := tx.Exec(r.Context(),

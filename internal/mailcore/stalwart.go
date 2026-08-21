@@ -191,6 +191,11 @@ func (s *Stalwart) principalExists(ctx context.Context, name string) (bool, erro
 	return false, err
 }
 
+// Note: JMAP account ids are deliberately NOT derived from the management
+// API's numeric principal id. Stalwart's id codec is internal (its alphabet
+// is not plain base32), so mailservice reads the id from the JMAP session
+// instead.
+
 // EnsureDomain creates the domain principal when absent.
 func (s *Stalwart) EnsureDomain(ctx context.Context, name string) error {
 	exists, err := s.principalExists(ctx, name)

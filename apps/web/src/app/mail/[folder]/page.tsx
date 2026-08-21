@@ -6,7 +6,7 @@
 import { Suspense, use, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, formatDate, type MessageList, type MessageListItem } from "@/lib/api";
+import { ApiError, api, formatDate, type MessageList, type MessageListItem } from "@/lib/api";
 import { Button, EmptyState, ErrorState, IconButton, ListSkeleton, Segmented, cx, useToast } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { MessagePane } from "@/components/message-pane";
@@ -252,7 +252,16 @@ function FolderWorkspace({ folder }: { folder: string }) {
         {/* Rows */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {list.isLoading && <ListSkeleton rows={10} />}
-          {list.isError && <ErrorState message="Could not load messages" onRetry={() => list.refetch()} />}
+          {list.isError && (
+            <ErrorState
+              message={
+                list.error instanceof ApiError && list.error.code === "MAIL_SERVICE_UNAVAILABLE"
+                  ? "Mail service is temporarily unavailable. Your messages are safe; try again in a moment."
+                  : "Could not load messages"
+              }
+              onRetry={() => list.refetch()}
+            />
+          )}
           {list.isSuccess && items.length === 0 && (
             <EmptyState
               icon={folder === "search" ? "search" : folder === "drafts" ? "file-text" : "inbox"}

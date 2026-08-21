@@ -230,10 +230,9 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w, r)
 		return
 	}
-	// Push the new mailbox account into the mail core (post-commit; failure
-	// leaves it retryable via POST /mailboxes/{id}/provision).
+	// Mail-core provisioning of the new mailbox runs asynchronously.
 	if mailboxID != "" {
-		h.Provisioner.ProvisionMailbox(r.Context(), id.TenantID, mailboxID, id.UserID)
+		h.Provisioner.Enqueue(r.Context(), "mailbox", id.TenantID, mailboxID, id.UserID)
 	}
 	h.Audit.Record(r.Context(), audit.Entry{
 		TenantID: id.TenantID, ActorUserID: id.UserID, Action: "user.create",
