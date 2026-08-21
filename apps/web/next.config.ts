@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Pin the Turbopack root to this app. Without it Turbopack walks up looking
   // for a lockfile and can settle on a directory far above the repo (any stray
   // package-lock.json in a parent), which pulls unrelated sibling projects into
