@@ -63,16 +63,27 @@ function MailShell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const canMail = me.data?.permissions.includes("mail.read") ?? false;
   // Deliberately not gated on `me`: both requests carry the same session
   // cookie, so waiting for /me first only serialises two round trips. If the
   // session is missing this 401s and is discarded by the redirect below.
   const summary = useQuery({
     queryKey: ["mail", "summary"],
     queryFn: () => api.get<MailSummary>("/api/v1/mail/summary"),
+    enabled: canMail,
     refetchInterval: 15_000,
   });
 
-  useEffect(() => { if (!me.isLoading && !me.data) router.replace("/login"); }, [me.isLoading, me.data, router]);
+  useEffect(() => {
+    if (me.isLoading) return;
+    if (!me.data) {
+      router.replace("/login");
+      return;
+    }
+    if (!canMail) {
+      router.replace(me.data.permissions.includes("users.manage") ? "/admin" : "/login");
+    }
+  }, [me.isLoading, me.data, canMail, router]);
 
   // Global shortcuts: "/" → focus search, "C" → compose (Ctrl/Cmd+K opens
   // the command palette, handled by <CommandPalette />).
@@ -95,7 +106,7 @@ function MailShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("keydown", handler);
   }, [openCompose]);
 
-  if (me.isLoading || !me.data) {
+  if (me.isLoading || !me.data || !canMail) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <PageLoader label="Loading QazEra" />
