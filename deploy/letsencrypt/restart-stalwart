@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root_dir=/home/admmail/email
+pid_file="$root_dir/var/stalwart.pid"
+if [[ -f "$pid_file" ]]; then
+    old_pid=$(cat "$pid_file" 2>/dev/null || true)
+    if [[ "$old_pid" =~ ^[0-9]+$ ]] && kill -0 "$old_pid" 2>/dev/null; then
+        kill "$old_pid"
+        for _ in $(seq 1 30); do
+            kill -0 "$old_pid" 2>/dev/null || break
+            sleep 1
+        done
+    fi
+fi
+
+cd "$root_dir"
+set -a
+. ./.env
+set +a
+nohup env \
+    STALWART_ADMIN_SECRET="$STALWART_ADMIN_PASSWORD" \
+    STALWART_MASTER_SECRET="$STALWART_MASTER_PASSWORD" \
+    /home/admmail/opt/stalwart-0.13.4/stalwart \
+    --config "$root_dir/deploy/stalwart/config.toml" \
+    >"$root_dir/var/logs/stalwart.log" 2>&1 </dev/null &
+echo $! > "$pid_file"
