@@ -67,7 +67,7 @@ local-keys = [
   "storage.directory",
 ]
 
-directory.internal]
+[directory.internal]
 type = "internal"
 store = "rocksdb"
 
