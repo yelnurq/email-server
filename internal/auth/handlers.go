@@ -81,11 +81,6 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := clientIP(r)
-	if !h.Limiter.Allow(r.Context(), "ip:"+ip) || !h.Limiter.Allow(r.Context(), "email:"+req.Email) {
-		httpx.Error(w, r, http.StatusTooManyRequests, "RATE_LIMITED", "Too many login attempts, try again later")
-		return
-	}
-
 	h.Log.Debug("login attempt", slog.String("email", req.Email), slog.String("ip", ip))
 
 	var userID, tenantID, status, passwordHash string
